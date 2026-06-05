@@ -90,7 +90,9 @@ docker compose -f infra/docker/docker-compose.yml down
 ```
 
 ### 🪟 Windows one‑click
-On Windows, double‑click **`Orbit.bat`** (on the Desktop, or create one from `infra/`) to start Docker, the dashboard, Expo, and the desktop app together. **`Stop-Orbit.bat`** stops the server stack.
+On Windows you don't need to type anything — just **double‑click `start.bat`** in the repo root. It launches Docker Desktop if needed, builds & starts the whole stack, waits for the dashboard, and opens it in your browser. It's portable (no hard‑coded paths), so it works wherever you cloned the repo.
+
+To stop later (your data is kept): `docker compose -f infra/docker/docker-compose.yml down`
 
 ---
 
