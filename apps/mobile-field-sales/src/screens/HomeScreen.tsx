@@ -504,7 +504,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.sm,
     backgroundColor: theme.color.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.color.border, ...theme.elevation.sm
   },
-  stopActive: { borderColor: theme.color.primary, borderWidth: 1.5, backgroundColor: theme.color.primarySoft },
+  stopActive: { borderColor: theme.color.primary, borderWidth: 1.5 },
   stopLocked: { opacity: 0.55, backgroundColor: theme.color.surfaceMuted },
   stopNumber: {
     width: 30, height: 30, borderRadius: 15, backgroundColor: theme.color.primarySoft,
