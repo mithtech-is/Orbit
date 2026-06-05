@@ -1,0 +1,16 @@
+graph LR
+  RN["React Native app"] --> API["Medusa API"]
+  WEB["Next.js dashboard"] --> API
+  DESK["Electron app"] --> API
+  API --> WF["Workflows"]
+  WF --> MOD["Field-sales modules"]
+  WF --> COM["Medusa commerce"]
+  MOD --> PG[("PostgreSQL/PostGIS")]
+  COM --> PG
+  WF --> REDIS[("Redis")]
+  REDIS --> WS["WebSocket gateway"]
+  WS --> WEB
+  WS --> DESK
+  WF --> MAPS["Maps provider"]
+  WF --> PUSH["Push provider"]
+  WF --> OBJ["Object storage"]

@@ -1,0 +1,742 @@
+openapi: 3.1.0
+info:
+  title: Orbit API
+  version: 0.1.0
+servers:
+  - url: http://localhost:9000
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: Authenticate with email/password/organisationId and receive a JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, organisationId]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                organisationId: { type: string }
+      responses:
+        "200":
+          description: JWT + user context.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, userId, organisationId, name, email, role, permissions]
+                properties:
+                  token: { type: string }
+                  userId: { type: string }
+                  organisationId: { type: string }
+                  name: { type: string }
+                  email: { type: string }
+                  role: { type: string }
+                  permissions:
+                    type: array
+                    items: { type: string }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Invalid credentials.
+  /api/v1/auth/session:
+    get:
+      summary: Return the authenticated actor session context.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Session context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/organisations:
+    get:
+      summary: Return current tenant readiness status.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Organisation status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [organisationId, status]
+                properties:
+                  organisationId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [ready]
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/outlets:
+    get:
+      summary: List tenant-scoped outlets.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Outlet list from PostGIS query service.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organisationId:
+                    type: string
+                  dataSource:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OutletSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Create a new outlet.
+      security:
+        - fieldSalesHeaders: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOutletInput"
+      responses:
+        "201":
+          description: Outlet created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutletSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/leads:
+    get:
+      summary: List tenant-scoped leads.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Lead list from query service.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organisationId:
+                    type: string
+                  dataSource:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LeadSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Create a new lead.
+      security:
+        - fieldSalesHeaders: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLeadInput"
+      responses:
+        "201":
+          description: Lead created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/territories:
+    get:
+      summary: List tenant-scoped territories.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Territory list with PostGIS envelope bounds.
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Create a new territory.
+      security:
+        - fieldSalesHeaders: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTerritoryInput"
+      responses:
+        "201":
+          description: Territory created.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  "/api/v1/territories/{id}":
+    put:
+      summary: Update a territory.
+      security:
+        - fieldSalesHeaders: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTerritoryInput"
+      responses:
+        "200":
+          description: Territory updated.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      summary: Delete a territory.
+      security:
+        - fieldSalesHeaders: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Territory deleted.
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  "/api/v1/territories/{id}/outlets":
+    get:
+      summary: List outlets located inside the territory's PostGIS boundary.
+      security:
+        - fieldSalesHeaders: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Outlets inside the territory polygon.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organisationId: { type: string }
+                  dataSource: { type: string }
+                  territoryId: { type: string }
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OutletSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/visits:
+    get:
+      summary: List tenant-scoped visits with check-in/check-out status.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Visit list.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organisationId:
+                    type: string
+                  dataSource:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VisitSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Check in to or check out from a visit.
+      security:
+        - fieldSalesHeaders: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/CheckInRequest"
+                - $ref: "#/components/schemas/CheckOutRequest"
+      responses:
+        "201":
+          description: Check-in or check-out result.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/tracking:
+    get:
+      summary: List today's work sessions.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Work sessions for today.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organisationId:
+                    type: string
+                  dataSource:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WorkSessionSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Record consent, revoke consent, start session, stop session, or record location pings.
+      security:
+        - bearerAuth: []
+        - fieldSalesHeaders: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/RecordConsentRequest"
+                - $ref: "#/components/schemas/RevokeConsentRequest"
+                - $ref: "#/components/schemas/StartSessionRequest"
+                - $ref: "#/components/schemas/StopSessionRequest"
+                - $ref: "#/components/schemas/RecordPingsRequest"
+      responses:
+        "201":
+          description: Action result.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflict — active session already exists.
+  /api/v1/route-plans:
+    get:
+      summary: List route plans with stops for the tenant.
+      security:
+        - fieldSalesHeaders: []
+      responses:
+        "200":
+          description: Route plan list.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  organisationId:
+                    type: string
+                  dataSource:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoutePlanDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Create an optimised route plan.
+      security:
+        - fieldSalesHeaders: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoutePlanInput"
+      responses:
+        "201":
+          description: Route plan created with optimised stop order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutePlanDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT obtained from POST /api/v1/auth/login.
+    fieldSalesHeaders:
+      type: apiKey
+      in: header
+      name: x-field-sales-user-id
+      description: Development scaffold authentication context, still accepted as a fallback alongside `bearerAuth`. Production will rely on `bearerAuth`.
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    Session:
+      type: object
+      required: [userId, organisationId, role, permissions]
+      properties:
+        userId:
+          type: string
+        organisationId:
+          type: string
+        role:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+    OutletSummary:
+      type: object
+      required: [id, organisationId, name, latitude, longitude]
+      properties:
+        id:
+          type: string
+        organisationId:
+          type: string
+        name:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+    CreateOutletInput:
+      type: object
+      required: [name, latitude, longitude]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+    LeadSummary:
+      type: object
+      required: [id, organisationId, outletId, name, status, priority, assignedUserId]
+      properties:
+        id:
+          type: string
+        organisationId:
+          type: string
+        outletId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        priority:
+          type: integer
+        assignedUserId:
+          type: string
+    CreateTerritoryInput:
+      type: object
+      required: [name, boundaryWkt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        boundaryWkt:
+          type: string
+          description: WKT MultiPolygon in SRID 4326.
+    CreateLeadInput:
+      type: object
+      required: [outletId, name]
+      properties:
+        id:
+          type: string
+        outletId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          default: new
+        priority:
+          type: integer
+          default: 1
+        assignedUserId:
+          type: string
+    VisitSummary:
+      type: object
+      required: [id, organisationId, outletId, assignedUserId, visitDate, status]
+      properties:
+        id:
+          type: string
+        organisationId:
+          type: string
+        outletId:
+          type: string
+        assignedUserId:
+          type: string
+        visitDate:
+          type: string
+          format: date
+        status:
+          type: string
+        outcome:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        checkedInAt:
+          type: string
+          format: date-time
+          nullable: true
+        checkedOutAt:
+          type: string
+          format: date-time
+          nullable: true
+        geofenceStatus:
+          type: string
+          nullable: true
+    CheckInRequest:
+      type: object
+      required: [action, outletId, latitude, longitude]
+      properties:
+        action:
+          type: string
+          enum: [check_in]
+        id:
+          type: string
+        outletId:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        outletLatitude:
+          type: number
+        outletLongitude:
+          type: number
+        geofenceRadiusMeters:
+          type: integer
+          default: 100
+    CheckOutRequest:
+      type: object
+      required: [action, visitId]
+      properties:
+        action:
+          type: string
+          enum: [check_out]
+        visitId:
+          type: string
+        outcome:
+          type: string
+        notes:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+    WorkSessionSummary:
+      type: object
+      required: [id, userId, status, startedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        startedLatitude:
+          type: number
+          nullable: true
+        startedLongitude:
+          type: number
+          nullable: true
+    RecordConsentRequest:
+      type: object
+      required: [action, granted]
+      properties:
+        action:
+          type: string
+          enum: [record_consent]
+        granted:
+          type: boolean
+    RevokeConsentRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [revoke_consent]
+    RecordPingsRequest:
+      type: object
+      required: [action, pings]
+      properties:
+        action:
+          type: string
+          enum: [record_pings]
+        pings:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [id, latitude, longitude]
+            properties:
+              id: { type: string, description: "Client-generated UUID; PK is (organisation_id, id) so duplicates from sync retries are silently ignored." }
+              latitude: { type: number, minimum: -90, maximum: 90 }
+              longitude: { type: number, minimum: -180, maximum: 180 }
+              accuracyMeters: { type: number, minimum: 0, nullable: true }
+              recordedAt: { type: string, format: date-time }
+    StartSessionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [start_session]
+        latitude:
+          type: number
+        longitude:
+          type: number
+    StopSessionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [stop_session]
+    CreateRoutePlanInput:
+      type: object
+      required: [routeDate, stopIds]
+      properties:
+        routeDate:
+          type: string
+          format: date
+        assignedUserId:
+          type: string
+        repLatitude:
+          type: number
+        repLongitude:
+          type: number
+        stopIds:
+          type: array
+          items:
+            type: object
+            required: [outletId]
+            properties:
+              outletId:
+                type: string
+              expectedDurationMinutes:
+                type: integer
+                default: 15
+              priority:
+                type: integer
+                default: 0
+    RoutePlanDetail:
+      type: object
+      required: [id, organisationId, assignedUserId, routeDate, status, plannedDistanceMeters, plannedDurationMinutes, provider, stops]
+      properties:
+        id:
+          type: string
+        organisationId:
+          type: string
+        assignedUserId:
+          type: string
+        routeDate:
+          type: string
+          format: date
+        status:
+          type: string
+        plannedDistanceMeters:
+          type: integer
+        plannedDurationMinutes:
+          type: integer
+        provider:
+          type: string
+        stops:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteStopDetail"
+    RouteStopDetail:
+      type: object
+      required: [id, outletId, outletName, outletLatitude, outletLongitude, stopOrder, status, expectedDurationMinutes]
+      properties:
+        id:
+          type: string
+        outletId:
+          type: string
+        outletName:
+          type: string
+        outletLatitude:
+          type: number
+        outletLongitude:
+          type: number
+        stopOrder:
+          type: integer
+        status:
+          type: string
+        expectedDurationMinutes:
+          type: integer
+  responses:
+    Forbidden:
+      description: Missing authentication context or insufficient tenant permission.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BadRequest:
+      description: Validation error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

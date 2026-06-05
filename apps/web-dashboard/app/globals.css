@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * shadcn/ui design tokens, mapped to Orbit's EXISTING colour palette
+ * (converted to HSL). Namespaced with `--sc-` so they never collide with the
+ * legacy styles.css variables (which keep their hex values for un-migrated
+ * pages). Light = the white/blue theme; dark mirrors `[data-theme="dark"]`.
+ * Preflight is disabled (tailwind.config) so this coexists with styles.css.
+ */
+@layer base {
+  :root {
+    /* Light — airy, refined neutrals with the #00aaff brand accent. */
+    --sc-background: 210 30% 98%;
+    --sc-foreground: 222 32% 12%;
+    --sc-card: 0 0% 100%;
+    --sc-card-foreground: 222 32% 12%;
+    --sc-popover: 0 0% 100%;
+    --sc-popover-foreground: 222 32% 12%;
+    --sc-primary: 200 100% 50%;
+    --sc-primary-foreground: 0 0% 100%;
+    --sc-secondary: 214 30% 96%;
+    --sc-secondary-foreground: 222 32% 18%;
+    --sc-muted: 214 30% 96%;
+    --sc-muted-foreground: 220 12% 46%;
+    --sc-accent: 200 90% 96%;
+    --sc-accent-foreground: 200 100% 28%;
+    --sc-destructive: 0 64% 50%;
+    --sc-destructive-foreground: 0 0% 100%;
+    --sc-success: 158 64% 36%;
+    --sc-success-foreground: 0 0% 100%;
+    --sc-warning: 26 78% 44%;
+    --sc-warning-foreground: 0 0% 100%;
+    --sc-border: 220 16% 90%;
+    --sc-input: 220 16% 88%;
+    --sc-ring: 200 100% 50%;
+    --sc-radius: 0.75rem;
+
+    /* Layered elevation — used by cards/popovers for real depth. */
+    --sc-shadow-sm: 0 1px 2px 0 hsl(220 30% 18% / 0.06), 0 1px 3px 0 hsl(220 30% 18% / 0.04);
+    --sc-shadow-md: 0 2px 4px -1px hsl(220 30% 18% / 0.06), 0 8px 20px -4px hsl(220 30% 18% / 0.10);
+    --sc-shadow-lg: 0 12px 32px -8px hsl(220 30% 18% / 0.18);
+  }
+
+  [data-theme="dark"] {
+    /* Refined near-black with a subtle cool tint + true elevation layers, so
+       cards/tables read with depth instead of a flat black sheet. Brand #00aaff. */
+    --sc-background: 222 24% 5%;
+    --sc-foreground: 210 24% 96%;
+    --sc-card: 220 18% 9%;
+    --sc-card-foreground: 210 24% 96%;
+    --sc-popover: 220 18% 10%;
+    --sc-popover-foreground: 210 24% 96%;
+    --sc-primary: 199 100% 52%;
+    --sc-primary-foreground: 0 0% 100%;
+    --sc-secondary: 220 14% 14%;
+    --sc-secondary-foreground: 210 24% 94%;
+    --sc-muted: 220 14% 13%;
+    --sc-muted-foreground: 218 12% 62%;
+    --sc-accent: 200 60% 16%;
+    --sc-accent-foreground: 199 100% 80%;
+    --sc-destructive: 0 78% 68%;
+    --sc-destructive-foreground: 0 0% 100%;
+    --sc-success: 158 55% 50%;
+    --sc-success-foreground: 0 0% 100%;
+    --sc-warning: 28 80% 60%;
+    --sc-warning-foreground: 26 40% 8%;
+    --sc-border: 220 14% 17%;
+    --sc-input: 220 14% 19%;
+    --sc-ring: 199 100% 52%;
+
+    --sc-shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.40);
+    --sc-shadow-md: 0 2px 8px -2px hsl(0 0% 0% / 0.50), 0 8px 24px -8px hsl(0 0% 0% / 0.55);
+    --sc-shadow-lg: 0 16px 40px -12px hsl(0 0% 0% / 0.65);
+  }
+
+  /* Smooth the light⇄dark switch instead of a hard flip. */
+  body, .nav, .card, .table, [data-theme] {
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+}

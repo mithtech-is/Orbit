@@ -1,0 +1,20 @@
+sequenceDiagram
+  autonumber
+  participant RN as React Native App
+  participant API as Medusa Tracking API
+  participant WF as ingestLocationBatch Workflow
+  participant Tracking as Tracking Module
+  participant PG as PostgreSQL/PostGIS
+  participant Redis as Redis Pub/Sub
+  participant WS as WebSocket Gateway
+  participant Web as Next.js Manager Dashboard
+  RN->>API: POST /api/v1/tracking/location-batch
+  API->>API: Validate token, tenant, device and rate limit
+  API->>WF: Invoke with idempotency keys
+  WF->>Tracking: Verify active work session
+  Tracking->>PG: Insert deduplicated pings and last-known location
+  WF->>Redis: Publish tracking.location.recorded
+  Redis->>WS: Fan out tenant event
+  WS->>WS: Filter by manager permissions/team
+  WS-->>Web: Live rep location update
+  API-->>RN: Accepted IDs and rejected IDs

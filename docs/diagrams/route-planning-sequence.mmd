@@ -1,0 +1,21 @@
+sequenceDiagram
+  autonumber
+  participant Web as Next.js Dashboard
+  participant API as Medusa Routes API
+  participant WF as generateRoutePlan Workflow
+  participant Route as Route Planning Module
+  participant Maps as Maps Provider Interface
+  participant PG as PostgreSQL/PostGIS
+  participant Redis as Redis Pub/Sub
+  participant RN as React Native App
+  Web->>API: POST /api/v1/routes/optimise
+  API->>API: Validate manager permission and tenant
+  API->>WF: reps, date, start points, stops
+  WF->>Route: Persist optimisation request
+  WF->>Maps: calculateDistanceMatrix and optimiseRoute
+  Maps-->>WF: Ordered stops and totals
+  WF->>Route: Create route plan, stops and assignment
+  Route->>PG: Save versioned plan
+  WF->>Redis: Publish route.plan.assigned
+  Redis-->>RN: Push/in-app route update request
+  API-->>Web: Route plan summary

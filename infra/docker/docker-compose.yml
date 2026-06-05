@@ -1,0 +1,134 @@
+# Orbit / Orbit full local stack.
+# Isolated compose project "orbit" — every service binds a FIXED port that
+# is reserved for Orbit only and does NOT collide with the other apps on
+# this machine (HR ERPNext :8080, Orbit CRM :8082, Polemarch POS :9000,
+# a host redis on :6379, a host service on :3000).
+#
+#   postgres  -> host 15432   (PostGIS)
+#   redis     -> host 6380    (6379 is taken on the host)
+#   backend   -> host 9090    (Orbit API; POS owns 9000)
+#   web       -> host 3001    (dashboard; 3000 is taken on the host)
+#
+# Mobile (Expo Metro :8088) and desktop (Electron, no port) run on the host —
+# they are clients of this stack, see the repo README / runbook.
+#
+#   docker compose -f infra/docker/docker-compose.yml up -d --build
+#   docker compose -f infra/docker/docker-compose.yml ps
+#   docker compose -f infra/docker/docker-compose.yml down
+name: orbit
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: orbit-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fieldsales}
+      POSTGRES_USER: ${POSTGRES_USER:-fieldsales}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fieldsales}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - orbit-postgres:/var/lib/postgresql/data
+      - ./init-postgis.sql:/docker-entrypoint-initdb.d/001-init-postgis.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-fieldsales} -d $${POSTGRES_DB:-fieldsales}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: orbit-redis
+    ports:
+      # 6379 is already taken on the host, so Orbit redis is reserved on 6380.
+      - "${REDIS_PORT:-6380}:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - orbit-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: apps/backend-medusa/Dockerfile
+    image: orbit-backend:local
+    container_name: orbit-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 9090
+      # In-cluster service DNS (host port mappings are irrelevant container-to-container).
+      DATABASE_URL: postgres://fieldsales:fieldsales@postgres:5432/fieldsales
+      REDIS_URL: redis://redis:6379
+      APP_URL: http://localhost:3001
+      AUTH_CORS: http://localhost:3001,http://localhost:3000
+      # ERPNext CRM runs on the HOST (compose project routepilot-crm, :8082),
+      # so reach it via the host gateway, not the container's own localhost.
+      ERPNEXT_BASE_URL: http://host.docker.internal:8082
+      # Maps/routing defaults so a freshly-cloned repo does REAL OSRM road routing
+      # out of the box (the richer .env.scaffold is git-ignored). Override via your
+      # shell env. NOTE: the User-Agent must identify a real app/contact —
+      # Nominatim returns 403 for any UA containing "example.com".
+      MAP_PROVIDER: ${MAP_PROVIDER:-osrm}
+      OSRM_USER_AGENT: ${OSRM_USER_AGENT:-Orbit/1.0 (+https://orbit.app)}
+      OSRM_BASE_URL: ${OSRM_BASE_URL:-https://router.project-osrm.org}
+      NOMINATIM_BASE_URL: ${NOMINATIM_BASE_URL:-https://nominatim.openstreetmap.org}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web-dashboard/Dockerfile
+    image: orbit-web:local
+    container_name: orbit-web
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      # The browser runs on the host, so it reaches the backend via the host
+      # port (9090), not the compose service name.
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:9090
+      NEXT_PUBLIC_WS_URL: ws://localhost:9090
+      NEXT_PUBLIC_MEDUSA_ADMIN_URL: http://localhost:9090
+    ports:
+      - "3001:3001"
+    healthcheck:
+      # 127.0.0.1 (not localhost): Next.js binds IPv4 0.0.0.0, but `localhost`
+      # resolves to IPv6 ::1 in the container, which would refuse the connection.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  # Pin the real volume names so renaming the compose project (now "orbit")
+  # keeps reusing the EXISTING data created under the old "docker" project name
+  # instead of silently starting from empty volumes.
+  orbit-postgres:
+    name: orbit-postgres
+  orbit-redis:
+    name: orbit-redis

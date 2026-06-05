@@ -1,0 +1,15 @@
+{
+  "name": "Orbit",
+  "short_name": "Orbit",
+  "description": "Field-sales operations dashboard",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/logo-64.png", "sizes": "64x64", "type": "image/png" },
+    { "src": "/logo-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

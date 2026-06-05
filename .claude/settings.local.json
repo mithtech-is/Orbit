@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(corepack enable)",
+      "PowerShell(corepack prepare pnpm@latest --activate 2>&1)",
+      "PowerShell(Get-Command pnpm -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

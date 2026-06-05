@@ -1,0 +1,21 @@
+sequenceDiagram
+  autonumber
+  participant RN as React Native App
+  participant SQLite as Mobile SQLite
+  participant API as Medusa Sync API
+  participant WF as pushMutations Workflow
+  participant Sync as Sync Module
+  participant Domain as Domain Workflows
+  participant PG as PostgreSQL
+  RN->>SQLite: Queue mutation with UUID and idempotency key
+  RN->>API: POST /api/v1/sync/push when network returns
+  API->>API: Validate tenant, device and cursor
+  API->>WF: Mutation batch
+  WF->>Sync: Check idempotency and ordering
+  loop each mutation
+    WF->>Domain: Execute target workflow
+    Domain->>PG: Persist accepted change
+  end
+  WF->>Sync: Record conflicts or failures
+  API-->>RN: Ack, conflicts and next cursor
+  RN->>SQLite: Mark synced, failed or needs review

@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared-types" },
+    { "path": "packages/validation" },
+    { "path": "packages/event-contracts" },
+    { "path": "packages/maps-provider" },
+    { "path": "packages/sync-engine" },
+    { "path": "packages/api-client" },
+    { "path": "packages/config" },
+    { "path": "packages/ui" }
+  ]
+}

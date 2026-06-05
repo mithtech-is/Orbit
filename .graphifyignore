@@ -1,0 +1,28 @@
+# .graphifyignore — same syntax as .gitignore
+# Dependencies & build output (the big token sinks)
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+.expo/
+coverage/
+.medusa/
+release/
+apps/desktop-operations/release/
+
+# Lockfiles & generated artifacts
+pnpm-lock.yaml
+*.tsbuildinfo
+*.log
+*.min.js
+*.map
+
+# VCS / tooling / graphify's own output
+.git/
+graphify-out/
+
+# Env files
+.env
+.env.*
+!.env.example

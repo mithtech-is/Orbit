@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  validate:
+    name: Lint / typecheck / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Workspace typecheck
+        run: pnpm typecheck
+
+      - name: Web dashboard typecheck
+        run: pnpm --filter @fieldsales/web-dashboard typecheck
+
+      - name: Mobile typecheck
+        run: pnpm --filter @fieldsales/mobile-field-sales typecheck
+
+      - name: Desktop build
+        run: pnpm --filter @fieldsales/desktop-operations build
+
+      - name: Tests
+        run: pnpm test
+
+  migrate-check:
+    name: Migrations apply cleanly to a fresh Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: routepilot
+          POSTGRES_PASSWORD: routepilot
+          POSTGRES_DB: routepilot
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U routepilot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.15.4 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgres://routepilot:routepilot@localhost:5432/routepilot
+        run: pnpm --filter @fieldsales/backend-medusa migrate up
+
+  docker-build:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend image
+        run: docker build -f apps/backend-medusa/Dockerfile -t routepilot-backend:ci .
+      - name: Web image
+        run: docker build -f apps/web-dashboard/Dockerfile -t routepilot-web:ci .
+
+  prod-env-validation:
+    name: Backend refuses to start without production secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.15.4 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Confirm production env validator rejects missing secrets
+        run: pnpm --filter @fieldsales/backend-medusa test -- env.test

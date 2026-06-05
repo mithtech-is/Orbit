@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts", "src/**/*.js"],
+  "ts-node": {
+    "transpileOnly": true,
+    "experimentalResolver": true,
+    "experimentalSpecifierResolution": "node"
+  }
+}

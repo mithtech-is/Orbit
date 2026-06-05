@@ -1,0 +1,17 @@
+sequenceDiagram
+  autonumber
+  participant RN as React Native App
+  participant API as Medusa Orders API
+  participant WF as createFieldOrder Workflow
+  participant Visit as Visit Module
+  participant Commerce as Medusa Commerce Modules
+  participant PG as PostgreSQL
+  participant Audit as Audit Module
+  RN->>API: POST /api/v1/orders/field
+  API->>API: Validate tenant, rep role and idempotency key
+  API->>WF: outlet, visit, line items
+  WF->>Visit: Verify assigned outlet/visit context
+  WF->>Commerce: Create cart/order using product, price and inventory modules
+  Commerce->>PG: Persist order and inventory effects
+  WF->>Audit: order.field_created
+  API-->>RN: Order confirmation and sync cursor

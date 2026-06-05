@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  participant RN as React Native App
+  participant API as Medusa API Route
+  participant WF as recordCheckIn Workflow
+  participant Visit as Visit Module
+  participant Tracking as Tracking Module
+  participant PG as PostgreSQL/PostGIS
+  participant Audit as Audit Module
+  RN->>API: POST /api/v1/visits/{id}/check-in
+  API->>API: Validate payload, tenant and role
+  API->>WF: Invoke with rep, outlet, coordinates
+  WF->>Tracking: Verify consent and active work session
+  WF->>Visit: Check outlet geofence radius
+  Visit->>PG: ST_DWithin outlet point and submitted point
+  alt inside geofence
+    WF->>Visit: Persist check-in
+  else outside or weak GPS
+    WF->>Visit: Create geofence exception
+  end
+  WF->>Audit: Write visit.checked_in or exception event
+  WF-->>API: Result
+  API-->>RN: Check-in status

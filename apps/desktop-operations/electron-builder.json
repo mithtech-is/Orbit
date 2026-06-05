@@ -1,0 +1,19 @@
+{
+  "appId": "com.orbit.operations",
+  "productName": "Orbit",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**",
+    "package.json"
+  ],
+  "win": {
+    "target": "nsis"
+  },
+  "mac": {
+    "target": "dmg",
+    "category": "public.app-category.business"
+  },
+  "publish": null
+}

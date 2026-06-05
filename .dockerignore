@@ -1,0 +1,27 @@
+# Keep the Docker build context small. The backend/web Dockerfiles run a fresh
+# `pnpm install` inside the image, so host node_modules / build output must NOT
+# be shipped to the daemon (they are huge and OS-specific).
+**/node_modules
+.git
+.github
+.pnpm-store
+**/.next
+**/.expo
+**/dist
+**/.turbo
+**/coverage
+# ...but NOT the dashboard's "Coverage map" route page, which lives at
+# apps/web-dashboard/app/coverage/ and was being wrongly excluded by the line above
+# (caused /coverage to 404 in the Docker web image).
+!apps/web-dashboard/app/coverage
+!apps/web-dashboard/app/coverage/**
+**/*.tsbuildinfo
+*.log
+graphify-out
+docs
+infra/erpnext-crm
+apps/desktop-operations/release
+apps/mobile-field-sales/android
+apps/mobile-field-sales/ios
+.codex-run
+.claude

@@ -1,0 +1,41 @@
+{
+  "name": "orbit-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b tsconfig.build.json",
+    "lint": "eslint .",
+    "seed:demo": "tsx scripts/seed-demo-data.ts --db",
+    "seed:demo:json": "tsx scripts/seed-demo-data.ts --json",
+    "seed:demo:sql": "tsx scripts/seed-demo-data.ts --sql",
+    "seed:minimal": "tsx scripts/seed-demo-data.ts --db --minimal",
+    "seed:minimal:sql": "tsx scripts/seed-demo-data.ts --sql --minimal",
+    "create-initial-admin": "pnpm --filter @orbit/backend-medusa create-initial-admin",
+    "dev:backend": "pnpm --filter @orbit/backend-medusa dev",
+    "dev:web": "pnpm --filter @orbit/web-dashboard dev",
+    "dev:mobile": "pnpm --filter @orbit/mobile-field-sales dev",
+    "dev:desktop": "pnpm --filter @orbit/desktop-operations dev"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "@typescript-eslint/eslint-plugin": "^8.19.1",
+    "@typescript-eslint/parser": "^8.19.1",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "18.3.12",
+      "@types/react-dom": "18.3.1"
+    }
+  }
+}
