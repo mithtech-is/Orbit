@@ -165,8 +165,8 @@ export function VisitCheckInScreen({ planId, stop, getCurrentPosition, sync, flu
       }
 
       const result = source === "camera"
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: [ImagePicker.MediaType.Images], quality: 0.65, base64: true })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: [ImagePicker.MediaType.Images], quality: 0.65, base64: true });
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.65, base64: true })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.65, base64: true });
       if (result.canceled) return;
 
       const asset = result.assets?.[0];
