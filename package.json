@@ -13,8 +13,8 @@
     "seed:demo:sql": "tsx scripts/seed-demo-data.ts --sql",
     "seed:minimal": "tsx scripts/seed-demo-data.ts --db --minimal",
     "seed:minimal:sql": "tsx scripts/seed-demo-data.ts --sql --minimal",
-    "create-initial-admin": "pnpm --filter @orbit/backend-medusa create-initial-admin",
-    "dev:backend": "pnpm --filter @orbit/backend-medusa dev",
+    "create-initial-admin": "pnpm --filter @orbit/backend create-initial-admin",
+    "dev:backend": "pnpm --filter @orbit/backend dev",
     "dev:web": "pnpm --filter @orbit/web-dashboard dev",
     "dev:mobile": "pnpm --filter @orbit/mobile-field-sales dev",
     "dev:desktop": "pnpm --filter @orbit/desktop-operations dev"
@@ -36,6 +36,10 @@
     "overrides": {
       "@types/react": "18.3.12",
       "@types/react-dom": "18.3.1"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
   }
 }

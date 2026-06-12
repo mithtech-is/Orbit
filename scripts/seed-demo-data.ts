@@ -137,7 +137,7 @@ async function seedDatabase() {
   const connectionString = process.env.DATABASE_URL ?? "postgres://fieldsales:fieldsales@localhost:5432/fieldsales";
   const client = new pg.Client({ connectionString });
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
-  const schemaSql = await readFile(join(root, "apps/backend-medusa/src/db/schema.sql"), "utf8");
+  const schemaSql = await readFile(join(root, "apps/backend/src/db/schema.sql"), "utf8");
 
   await client.connect();
 

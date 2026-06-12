@@ -45,7 +45,7 @@ Orbit is a **pnpm monorepo** with four apps and shared packages:
 
 | App | Path | Stack | Purpose |
 |-----|------|-------|---------|
-| **Backend API** | `apps/backend-medusa` | Node 22 · TypeScript · Postgres 16 + PostGIS · Redis · JWT · WebSocket | REST + realtime API, auth, route optimisation, sync |
+| **Backend API** | `apps/backend` | Node 22 · TypeScript · Postgres 16 + PostGIS · Redis · JWT · WebSocket | REST + realtime API, auth, route optimisation, sync |
 | **Web Dashboard** | `apps/web-dashboard` | Next.js 15 · React 19 · Tailwind · shadcn/ui · MapLibre GL | Manager/admin console (production build) |
 | **Mobile App** | `apps/mobile-field-sales` | Expo · React Native | Field rep app (GPS, camera, offline) |
 | **Desktop App** | `apps/desktop-operations` | Electron 33 | Desktop shell that loads the dashboard |
@@ -161,7 +161,7 @@ pnpm typecheck          # type-check the shared packages
 Run individual services without Docker:
 
 ```bash
-pnpm --filter @orbit/backend-medusa dev    # backend (needs Postgres + Redis reachable)
+pnpm --filter @orbit/backend dev    # backend (needs Postgres + Redis reachable)
 pnpm --filter @orbit/web-dashboard dev     # web in dev mode (Linux/macOS; see note below)
 ```
 
@@ -174,7 +174,7 @@ pnpm --filter @orbit/web-dashboard dev     # web in dev mode (Linux/macOS; see n
 ```
 Orbit/
 ├─ apps/
-│  ├─ backend-medusa/        # API, auth, route optimisation, sync (Node + tsx)
+│  ├─ backend/               # API, auth, route optimisation, sync (Node + tsx)
 │  ├─ web-dashboard/         # Next.js manager/admin console
 │  ├─ mobile-field-sales/    # Expo / React Native rep app
 │  └─ desktop-operations/    # Electron desktop shell

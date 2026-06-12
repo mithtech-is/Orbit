@@ -1,20 +1,44 @@
 import { createApiClient } from "@orbit/api-client";
 import type { MobileSession, TokenStorage } from "./auth/token-storage";
 
+import { NativeModules } from "react-native";
+
 // Expo Metro only inlines env vars prefixed with EXPO_PUBLIC_ at bundle time.
 // `process.env` doesn't exist at runtime in React Native, so the var must be
 // substituted by the bundler. Set `EXPO_PUBLIC_MOBILE_API_BASE_URL` in the
 // shell before `expo start` (or via .env / app.config.ts `extra` field).
+function getFallbackApiUrl() {
+  const scriptURL = NativeModules.SourceCode?.scriptURL;
+  if (scriptURL) {
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+    if (match) {
+      return `http://${match[1]}:9090`;
+    }
+  }
+  return "http://localhost:9090";
+}
+
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_MOBILE_API_BASE_URL ??
   process.env.MOBILE_API_BASE_URL ??
-  "http://localhost:9000";
+  getFallbackApiUrl();
 
 export const apiClient = createApiClient({ baseUrl: API_BASE_URL });
 
 /** Mirrors backend auth/areas.ts — only field reps belong in the field app. */
 function areaForRole(role: string | undefined): "admin" | "field" {
   return role === "field_sales_representative" ? "field" : "admin";
+}
+
+/** Decode JWT payload without a library — returns null on parse failure. */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+  } catch {
+    return null;
+  }
 }
 
 /** Thrown when a non-field (admin/manager/ops) user tries to use the field app. */
@@ -52,6 +76,18 @@ export async function rehydrateAuth(storage: TokenStorage): Promise<MobileSessio
     await storage.clear();
     apiClient.setToken("");
     return null;
+  }
+
+  // Expired JWT: check the exp claim before mounting the app. If stale, clear
+  // the session and force re-login instead of letting every API call 403.
+  const payload = decodeJwtPayload(session.token);
+  if (payload) {
+    const exp = payload.exp as number | undefined;
+    if (exp && Date.now() >= exp * 1000) {
+      await storage.clear();
+      apiClient.setToken("");
+      return null;
+    }
   }
 
   apiClient.setToken(session.token);

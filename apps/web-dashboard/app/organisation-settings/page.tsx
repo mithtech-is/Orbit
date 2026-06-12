@@ -41,6 +41,9 @@ export default function OrganisationSettingsPage(): JSX.Element {
   const [timezone, setTimezone] = useState("UTC");
   const [currency, setCurrency] = useState("INR");
   const [days, setDays] = useState<string[]>(["mon", "tue", "wed", "thu", "fri"]);
+  // Fuel — UI in the user's currency (₹), stored as cents.
+  const [defaultRate, setDefaultRate] = useState("0");
+  const [dailyLimit, setDailyLimit] = useState("0");
 
   useEffect(() => {
     void (async () => {
@@ -54,6 +57,8 @@ export default function OrganisationSettingsPage(): JSX.Element {
         setTimezone(result.timezone);
         setCurrency(result.currency);
         setDays(result.workingDays);
+        setDefaultRate((result.mileageRatePerKmCents / 100).toFixed(2));
+        setDailyLimit((result.dailyFuelLimitCents / 100).toFixed(0));
       } else {
         setError("Couldn't load organisation settings.");
       }
@@ -79,7 +84,9 @@ export default function OrganisationSettingsPage(): JSX.Element {
         workingHoursEnd: hoursEnd,
         timezone: timezone.trim(),
         currency: currency.trim().toUpperCase(),
-        workingDays: days
+        workingDays: days,
+        mileageRatePerKmCents: Math.round(Number(defaultRate) * 100),
+        dailyFuelLimitCents: Math.round(Number(dailyLimit) * 100)
       });
       setData(result);
       setSuccess("Settings saved.");
@@ -167,6 +174,47 @@ export default function OrganisationSettingsPage(): JSX.Element {
               <div className="grid gap-1.5">
                 <Label htmlFor="os-cur">Currency (ISO 4217)</Label>
                 <Input id="os-cur" type="text" maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} required placeholder="INR" className="uppercase" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Fuel & expenses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Reps never enter fuel amounts directly. The amount is computed at
+              session-stop from <strong>actual GPS distance × rate</strong>. Effective
+              rate cascade: rep override → vehicle-type rate → this org default.
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="os-rate">Org default fuel rate ({currency} / km)</Label>
+                <Input
+                  id="os-rate"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={defaultRate}
+                  onChange={(e) => setDefaultRate(e.target.value)}
+                  placeholder="e.g. 3.50"
+                />
+                <span className="text-xs text-muted-foreground">Used only when neither the rep nor their vehicle defines a rate.</span>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="os-limit">Daily fuel limit ({currency}, 0 = no cap)</Label>
+                <Input
+                  id="os-limit"
+                  type="number"
+                  step="1"
+                  min={0}
+                  value={dailyLimit}
+                  onChange={(e) => setDailyLimit(e.target.value)}
+                  placeholder="e.g. 500"
+                />
+                <span className="text-xs text-muted-foreground">Expenses over this still record, but flag for approval and require a reason.</span>
               </div>
             </div>
           </CardContent>

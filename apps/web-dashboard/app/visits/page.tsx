@@ -2,7 +2,8 @@
 
 import type { JSX } from "react";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Download } from "lucide-react";
 import { apiClient, safeFetch } from "../api-service";
 import type { VisitSummary, UserSummary, VisitExtras, VisitProofPhoto } from "@orbit/api-client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +13,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 function rupees(cents: number): string {
   return `₹${(cents / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+/** Map an image content type to a sensible download file extension. */
+function fileExt(contentType: string): string {
+  if (contentType.includes("png")) return "png";
+  if (contentType.includes("webp")) return "webp";
+  if (contentType.includes("heic")) return "heic";
+  if (contentType.includes("gif")) return "gif";
+  return "jpg";
 }
 
 function geofenceVariant(status: string | null): "success" | "warning" | "secondary" {
@@ -87,24 +97,44 @@ function ProofPhotos({ photos }: { photos: VisitProofPhoto[] }): JSX.Element {
   return (
     <div className="min-w-[220px]">
       <strong className="text-foreground">Proof photos</strong>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-3">
         {photos.map((photo) => (
-          images[photo.id] ? (
-            <img
-              key={photo.id}
-              src={images[photo.id]}
-              alt={photo.caption ?? "Visit proof photo"}
-              className="h-24 w-24 rounded-md border bg-background object-cover"
-            />
-          ) : (
-            <div key={photo.id} className="flex h-24 w-24 items-center justify-center rounded-md border bg-background text-xs text-muted-foreground">
-              Loading
-            </div>
-          )
+          <div key={photo.id} className="flex flex-col items-center gap-1">
+            {images[photo.id] ? (
+              <>
+                {/* Click the image to open it full-size in a new tab. */}
+                <a href={images[photo.id]} target="_blank" rel="noreferrer" title={photo.caption ?? "Open full size"}>
+                  <img
+                    src={images[photo.id]}
+                    alt={photo.caption ?? "Visit proof photo"}
+                    className="h-24 w-24 rounded-md border bg-background object-cover transition-opacity hover:opacity-90"
+                  />
+                </a>
+                <a
+                  href={images[photo.id]}
+                  download={`visit-photo-${photo.id}.${fileExt(photo.contentType)}`}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <Download className="h-3 w-3" /> Download
+                </a>
+              </>
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded-md border bg-background text-xs text-muted-foreground">
+                Loading
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>
   );
+}
+
+interface RepGroup {
+  key: string;
+  name: string;
+  visits: VisitSummary[];
+  completed: number;
 }
 
 export default function VisitsPage(): JSX.Element {
@@ -112,6 +142,7 @@ export default function VisitsPage(): JSX.Element {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedRep, setExpandedRep] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [extras, setExtras] = useState<Record<string, VisitExtras | "loading">>({});
 
@@ -140,14 +171,45 @@ export default function VisitsPage(): JSX.Element {
 
   const userName = (id: string) => users.find((u) => u.id === id)?.name ?? id;
 
+  // Group visits by the rep they're assigned to, so the page stays compact when
+  // there are many reps: one row per rep, click to reveal that rep's visits.
+  const groups = useMemo<RepGroup[]>(() => {
+    const byRep = new Map<string, VisitSummary[]>();
+    for (const v of visits) {
+      const key = v.assignedUserId || "__unassigned__";
+      const arr = byRep.get(key);
+      if (arr) arr.push(v); else byRep.set(key, [v]);
+    }
+    const result: RepGroup[] = [];
+    for (const [key, list] of byRep) {
+      result.push({
+        key,
+        name: key === "__unassigned__" ? "Unassigned" : userName(key),
+        visits: list,
+        completed: list.filter((v) => v.status === "completed").length
+      });
+    }
+    // Named reps first (alphabetical), Unassigned last.
+    result.sort((a, b) => {
+      if (a.key === "__unassigned__") return 1;
+      if (b.key === "__unassigned__") return -1;
+      return a.name.localeCompare(b.name);
+    });
+    return result;
+  }, [visits, users]);
+
+  function toggleRep(key: string) {
+    setExpandedRep((cur) => (cur === key ? null : key));
+  }
+
   return (
     <main className="shell font-sans">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Visits</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Check-in and check-out history across your team.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Check-in and check-out history, grouped by representative.</p>
         </div>
-        <Badge variant="secondary" className="shrink-0">{loading ? "Loading…" : `${visits.length} visits`}</Badge>
+        <Badge variant="secondary" className="shrink-0">{loading ? "Loading…" : `${groups.length} reps · ${visits.length} visits`}</Badge>
       </div>
 
       {error ? (
@@ -164,55 +226,78 @@ export default function VisitsPage(): JSX.Element {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Visit</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned to</TableHead>
-                <TableHead>Check-in</TableHead>
-                <TableHead>Check-out</TableHead>
-                <TableHead>Geofence</TableHead>
-                <TableHead>Outcome</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Details</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visits.map((visit) => (
-                <Fragment key={visit.id}>
-                  <TableRow>
-                    <TableCell className="font-mono text-xs">{visit.id.slice(-10)}</TableCell>
-                    <TableCell><Badge variant={visitVariant(visit.status)}>{visit.status.replace(/_/g, " ")}</Badge></TableCell>
-                    <TableCell>{visit.assignedUserId ? userName(visit.assignedUserId) : <span className="text-muted-foreground">Unassigned</span>}</TableCell>
-                    <TableCell className="text-muted-foreground">{visit.checkedInAt ? new Date(visit.checkedInAt).toLocaleString() : "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{visit.checkedOutAt ? new Date(visit.checkedOutAt).toLocaleString() : "—"}</TableCell>
-                    <TableCell>{visit.geofenceStatus ? <Badge variant={geofenceVariant(visit.geofenceStatus)}>{visit.geofenceStatus}</Badge> : "—"}</TableCell>
-                    <TableCell>{visit.outcome ?? "—"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate text-muted-foreground" title={visit.notes ?? undefined}>{visit.notes ?? "—"}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => void toggleDetails(visit.id)}>
-                        {expandedId === visit.id ? "Hide" : "View"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                  {expandedId === visit.id ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="bg-muted/50">
-                        {extras[visit.id] === "loading" || !extras[visit.id] ? (
-                          <span className="text-sm text-muted-foreground">Loading details…</span>
-                        ) : (
-                          <VisitExtrasView data={extras[visit.id] as VisitExtras} />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <div className="flex flex-col gap-3">
+          {groups.map((group) => {
+            const open = expandedRep === group.key;
+            return (
+              <Card key={group.key} className="overflow-hidden">
+                {/* Rep header — click to expand that rep's visits. */}
+                <button
+                  type="button"
+                  onClick={() => toggleRep(group.key)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+                  aria-expanded={open}
+                >
+                  {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                  <span className="font-semibold text-foreground">{group.name}</span>
+                  <span className="flex-1" />
+                  <Badge variant="secondary" className="shrink-0">{group.visits.length} visit{group.visits.length === 1 ? "" : "s"}</Badge>
+                  <Badge variant="success" className="shrink-0">{group.completed} completed</Badge>
+                </button>
+
+                {open ? (
+                  <div className="border-t border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Visit</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Check-in</TableHead>
+                          <TableHead>Check-out</TableHead>
+                          <TableHead>Geofence</TableHead>
+                          <TableHead>Outcome</TableHead>
+                          <TableHead>Notes</TableHead>
+                          <TableHead>Details</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {group.visits.map((visit) => (
+                          <Fragment key={visit.id}>
+                            <TableRow>
+                              <TableCell className="font-mono text-xs">{visit.id.slice(-10)}</TableCell>
+                              <TableCell><Badge variant={visitVariant(visit.status)}>{visit.status.replace(/_/g, " ")}</Badge></TableCell>
+                              <TableCell className="text-muted-foreground">{visit.checkedInAt ? new Date(visit.checkedInAt).toLocaleString() : "—"}</TableCell>
+                              <TableCell className="text-muted-foreground">{visit.checkedOutAt ? new Date(visit.checkedOutAt).toLocaleString() : "—"}</TableCell>
+                              <TableCell>{visit.geofenceStatus ? <Badge variant={geofenceVariant(visit.geofenceStatus)}>{visit.geofenceStatus}</Badge> : "—"}</TableCell>
+                              <TableCell>{visit.outcome ?? "—"}</TableCell>
+                              <TableCell className="max-w-[200px] truncate text-muted-foreground" title={visit.notes ?? undefined}>{visit.notes ?? "—"}</TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" onClick={() => void toggleDetails(visit.id)}>
+                                  {expandedId === visit.id ? "Hide" : "View"}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {expandedId === visit.id ? (
+                              <TableRow>
+                                <TableCell colSpan={8} className="bg-muted/50">
+                                  {extras[visit.id] === "loading" || !extras[visit.id] ? (
+                                    <span className="text-sm text-muted-foreground">Loading details…</span>
+                                  ) : (
+                                    <VisitExtrasView data={extras[visit.id] as VisitExtras} />
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ) : null}
+                          </Fragment>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+              </Card>
+            );
+          })}
+        </div>
       )}
     </main>
   );

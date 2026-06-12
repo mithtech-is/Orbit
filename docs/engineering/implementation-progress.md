@@ -928,5 +928,36 @@ To build a runnable dev client on a real device:
 | `POST /api/v1/users` invite | ✅ returned temp password + `passwordChangeRequired:true` |
 | `GET /live-map` | ✅ 200 OK, MapLibre rendering with OSM tiles |
 
+## 2026-06-10 (Session 16 — ERPNext-primary product catalog + online order sync)
+
+### Completed
+
+- Added `pullProducts`, `searchProducts`, `pullProductStock` methods to `ErpProvider` interface (`erp-provider.ts`)
+- Implemented all three in the ERPNext provider (`erpnext-provider.ts`):
+  - `pullProducts` — fetches all Items via `/api/resource/Item`
+  - `searchProducts` — searches Items by name via `item_name like %query%`
+  - `pullProductStock` — reads stock from the Bin doctype (`actual_qty`, `reserved_qty`, `ordered_qty`)
+- Added `pullProductsFromErp()` in `erp-sync.ts` — orchestrates pull from ERPNext, upserts into `field_product` by SKU, and persists entity mappings
+- Added `upsertProductBySku()` in the commerce repository — upserts by `(organisation_id, sku)` unique constraint
+- Rewrote `products/route.ts`:
+  - `POST` → creates ERPNext Item first (`pushProduct`), caches locally on success; falls back to local-only if ERPNext is unreachable
+  - `PUT` → updates ERPNext Item first, updates local cache; falls back to local-only
+  - `GET` → reads from local cache; supports `X-Refresh: true` header to trigger pull-from-ERPNext first
+  - Responses include `erpId` when the ERP sync succeeds
+- Enhanced `field-orders/route.ts`:
+  - When `source === "online"` → syncs to ERPNext Sales Order synchronously, returns `erpOrderId` in response
+  - When `source === "offline"` → existing best-effort async sync (unchanged)
+- Changed `syncFieldOrderToErp()` to return the ERP Sales Order id (was `void`)
+- Added `product-catalog-sync.ts` scheduled job — pulls products from ERPNext for all orgs every 15 minutes (configurable via `PRODUCT_CATALOG_SYNC_INTERVAL_MS`, disabled via `PRODUCT_CATALOG_SYNC_ENABLED=false`)
+- Registered product catalog sync in dev-server bootstrap
+- Fixed Medusa-era test artifact in `dispatch.test.ts` (removed `medusaOrderId` assertion)
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npx tsc --noEmit` | ✅ clean |
+| `npx vitest run` | ✅ 23 files, 120 tests |
+
 ### Status
 **Pilot-ready for 1 customer / ≤20 reps / single instance.** See `docs/engineering/pilot-readiness-report.md` for tier-by-tier verdicts. All ship-blockers from the user's prompt are fixed and verified; remaining gaps (HA, SSO, automated backups, Medusa runtime cutover) are explicitly out of scope for pilot.

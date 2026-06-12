@@ -13,7 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const MEDUSA_ADMIN_BASE = process.env.NEXT_PUBLIC_MEDUSA_ADMIN_URL ?? "http://localhost:9001";
+// ERPNext admin base — used to deep-link a synced Sales Order into the ERPNext UI
+// so admins can manage products + orders + expenses under one tree.
+const ERP_ADMIN_BASE = process.env.NEXT_PUBLIC_ERP_ADMIN_URL ?? "http://localhost:8082";
 
 function formatCurrency(cents: number, currency: string): string {
   try {
@@ -152,7 +154,7 @@ export default function FieldOrdersPage(): JSX.Element {
                 <TableHead>Status</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Actions</TableHead>
-                <TableHead>Medusa</TableHead>
+                <TableHead>ERPNext</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -176,8 +178,8 @@ export default function FieldOrdersPage(): JSX.Element {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {o.medusaOrderId ? (
-                      <a href={`${MEDUSA_ADMIN_BASE}/app/draft-orders/${o.medusaOrderId}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                    {o.erpOrderId ? (
+                      <a href={`${ERP_ADMIN_BASE}/app/sales-order/${encodeURIComponent(o.erpOrderId)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                         View <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : (

@@ -375,6 +375,42 @@ export interface UserSummary {
   role: string;
   active: boolean;
   passwordChangeRequired: boolean;
+  /** Vehicle assignment + per-rep fuel-rate override (null = inherit cascade). */
+  vehicleTypeId?: string | null;
+  fuelRatePerKmCents?: number | null;
+}
+
+export interface VehicleTypeSummary {
+  id: string;
+  organisationId: string;
+  name: string;
+  fuelRatePerKmCents: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface FieldExpenseSummary {
+  id: string;
+  organisationId: string;
+  repUserId: string;
+  repName: string | null;
+  workSessionId: string | null;
+  expenseDate: string;
+  category: string;
+  actualDistanceKm: number;
+  plannedDistanceKm: number;
+  deviationKm: number;
+  ratePerKmCents: number;
+  amountCents: number;
+  deviationAmountCents: number;
+  overLimit: boolean;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected" | string;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectionReason: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface InviteUserInput {
@@ -404,6 +440,10 @@ export interface OrganisationSettings {
   timezone: string;
   currency: string;
   workingDays: string[];
+  /** Org-wide default ₹/km in cents — the fallback in the rate cascade. */
+  mileageRatePerKmCents: number;
+  /** Daily fuel spend cap in cents (0 = no limit). */
+  dailyFuelLimitCents: number;
 }
 
 export interface UpdateOrganisationSettingsInput {
@@ -414,6 +454,8 @@ export interface UpdateOrganisationSettingsInput {
   timezone?: string;
   currency?: string;
   workingDays?: string[];
+  mileageRatePerKmCents?: number;
+  dailyFuelLimitCents?: number;
 }
 
 export interface MyDayResponse {
@@ -672,7 +714,7 @@ export interface FieldOrderSummary {
   source: string;
   totalCents: number;
   createdAt: string;
-  medusaOrderId?: string | null;
+  erpOrderId?: string | null;
 }
 
 export interface CreateFieldOrderInput {
@@ -743,6 +785,18 @@ export function createApiClient(options: ApiClientOptions) {
       throw new Error(`API DELETE failed: ${response.status}`);
     }
 
+    return (await response.json()) as T;
+  }
+
+  async function patch<T>(path: string, body: unknown): Promise<T> {
+    const response = await fetcher(`${options.baseUrl}${path}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      throw new Error(`API PATCH failed: ${response.status}`);
+    }
     return (await response.json()) as T;
   }
 
@@ -873,7 +927,23 @@ export function createApiClient(options: ApiClientOptions) {
     },
 
     stopSession() {
-      return post<{ id: string; status: string; stoppedAt: string }>("/api/v1/tracking", { action: "stop_session" });
+      // Server returns the just-computed daily fuel summary when applicable, so the
+      // mobile UI can immediately surface "you went 12 km off-plan, tap to explain".
+      return post<{
+        id: string;
+        status: string;
+        stoppedAt: string;
+        fuel: null | {
+          expenseId: string;
+          actualKm: number;
+          plannedKm: number;
+          deviationKm: number;
+          amountCents: number;
+          deviationAmountCents: number;
+          overLimit: boolean;
+          rateSource: string;
+        };
+      }>("/api/v1/tracking", { action: "stop_session" });
     },
 
     revokeConsent(reason?: string) {
@@ -1224,6 +1294,40 @@ export function createApiClient(options: ApiClientOptions) {
 
     updateOrganisationSettings(input: UpdateOrganisationSettingsInput) {
       return put<OrganisationSettings>("/api/v1/organisation-settings", input);
+    },
+
+    // Vehicle types + per-rep vehicle assignment ----------------------------
+    listVehicleTypes() {
+      return request<ListResponse<VehicleTypeSummary>>("/api/v1/vehicle-types");
+    },
+    createVehicleType(input: { name: string; fuelRatePerKmCents: number; active?: boolean }) {
+      return post<VehicleTypeSummary>("/api/v1/vehicle-types", input);
+    },
+    updateVehicleType(id: string, input: { name?: string; fuelRatePerKmCents?: number; active?: boolean }) {
+      return put<VehicleTypeSummary>(`/api/v1/vehicle-types/${id}`, input);
+    },
+    deactivateVehicleType(id: string) {
+      return del<{}>(`/api/v1/vehicle-types/${id}`);
+    },
+    updateUserVehicle(id: string, input: { vehicleTypeId?: string | null; fuelRatePerKmCents?: number | null }) {
+      return put<UserSummary>(`/api/v1/users/${id}/vehicle`, input);
+    },
+
+    // Field expenses (daily auto-computed fuel) -----------------------------
+    listFieldExpenses(opts?: { status?: "pending" | "approved" | "rejected" }) {
+      const qs = opts?.status ? `?status=${encodeURIComponent(opts.status)}` : "";
+      return request<{ organisationId: string; dataSource: string; repScoped: boolean; items: FieldExpenseSummary[] }>(
+        `/api/v1/field-expenses${qs}`
+      );
+    },
+    submitFieldExpenseReason(id: string, reason: string) {
+      return patch<FieldExpenseSummary>(`/api/v1/field-expenses/${id}/reason`, { reason });
+    },
+    approveFieldExpense(id: string) {
+      return patch<FieldExpenseSummary>(`/api/v1/field-expenses/${id}/approve`, {});
+    },
+    rejectFieldExpense(id: string, rejectionReason: string) {
+      return patch<FieldExpenseSummary>(`/api/v1/field-expenses/${id}/reject`, { rejectionReason });
     },
 
     async login(input: LoginInput): Promise<LoginResponse> {

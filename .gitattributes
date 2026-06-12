@@ -1,0 +1,8 @@
+# Cross-platform line endings:
+# Shell scripts MUST use LF — bash on macOS / Linux refuses CRLF (returns
+# `$'\r': command not found`). Force LF in the working tree on every OS.
+*.command  text eol=lf
+*.sh       text eol=lf
+
+# .bat is Windows-only; force CRLF so it still runs after a Linux/macOS edit.
+*.bat      text eol=crlf

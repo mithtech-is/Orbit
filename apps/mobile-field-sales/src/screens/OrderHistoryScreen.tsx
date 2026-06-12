@@ -33,7 +33,7 @@ interface SyncedOrderRow {
   status: string;
   source: string;
   createdAt: string;
-  medusaOrderId?: string | null;
+  erpOrderId?: string | null;
 }
 
 type Row = PendingOrderRow | SyncedOrderRow;
@@ -112,7 +112,7 @@ export function OrderHistoryScreen({ sync, flushNow }: Props): JSX.Element {
       status: o.status,
       source: o.source,
       createdAt: o.createdAt,
-      medusaOrderId: o.medusaOrderId
+      erpOrderId: o.erpOrderId
     }))
   ];
 
@@ -179,8 +179,8 @@ export function OrderHistoryScreen({ sync, flushNow }: Props): JSX.Element {
               <Text style={styles.rowMeta}>
                 {(item.totalCents / 100).toFixed(2)} · {item.source} · {new Date(item.createdAt).toLocaleTimeString()}
               </Text>
-              {item.medusaOrderId ? (
-                <Text style={styles.medusaRef}>Synced to Medusa</Text>
+              {item.erpOrderId ? (
+                <Text style={styles.erpRef}>Synced to ERPNext · {item.erpOrderId}</Text>
               ) : null}
             </View>
             <View style={[styles.pill, styles.pillSynced]}>
@@ -246,7 +246,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   rowTitle: { ...theme.font.bodyStrong },
   rowMeta: { ...theme.font.caption, marginTop: 2 },
   errorReason: { color: theme.color.danger, fontSize: 11, marginTop: 2 },
-  medusaRef: { color: theme.color.success, fontSize: 11, marginTop: 2, fontWeight: "600" },
+  erpRef: { color: theme.color.success, fontSize: 11, marginTop: 2, fontWeight: "600" },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, marginLeft: theme.spacing.md },
   pillText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
   pillSynced: { backgroundColor: theme.color.successSoft },

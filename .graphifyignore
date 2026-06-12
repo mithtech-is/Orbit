@@ -7,7 +7,6 @@ build/
 .turbo/
 .expo/
 coverage/
-.medusa/
 release/
 apps/desktop-operations/release/
 

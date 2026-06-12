@@ -35,14 +35,15 @@ COPY apps/web-dashboard ./apps/web-dashboard
 # (e.g. `docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.com`).
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:9090
 ARG NEXT_PUBLIC_WS_URL=ws://localhost:9090
-ARG NEXT_PUBLIC_MEDUSA_ADMIN_URL=http://localhost:9090
+# Deep-link target for the "View in ERP" affordance on field orders / products / expenses.
+ARG NEXT_PUBLIC_ERP_ADMIN_URL=http://localhost:8082
 
 # Produce the optimised production build (.next). NODE_ENV=production so NEXT_PUBLIC_*
 # are inlined correctly and the build is fully optimised.
 RUN cd apps/web-dashboard && NODE_ENV=production \
     NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
     NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL \
-    NEXT_PUBLIC_MEDUSA_ADMIN_URL=$NEXT_PUBLIC_MEDUSA_ADMIN_URL \
+    NEXT_PUBLIC_ERP_ADMIN_URL=$NEXT_PUBLIC_ERP_ADMIN_URL \
     pnpm exec next build
 
 # ---------- runtime ----------

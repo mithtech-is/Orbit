@@ -1,0 +1,42 @@
+{
+  "name": "@orbit/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/dev-server.ts",
+    "create-initial-admin": "tsx src/cli/create-initial-admin.ts",
+    "backfill-calculated-kms": "tsx src/scripts/backfill-calculated-kms.ts",
+    "migrate": "node-pg-migrate --migrations-dir migrations --migration-file-language sql",
+    "migrate:up": "pnpm migrate up",
+    "migrate:down": "pnpm migrate down",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/websocket": "^11.2.0",
+    "@orbit/event-contracts": "workspace:*",
+    "@orbit/maps-provider": "workspace:*",
+    "@orbit/shared-types": "workspace:*",
+    "@orbit/validation": "workspace:*",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "bcryptjs": "^3.0.3",
+    "fastify": "^5.8.5",
+    "ioredis": "^5.11.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "@types/ws": "^8.5.13",
+    "node-pg-migrate": "^7.9.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

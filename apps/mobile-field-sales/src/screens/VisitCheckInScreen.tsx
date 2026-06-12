@@ -30,7 +30,9 @@ interface IntelRow { competitor: string; product: string; price: string }
 interface SampleRow { item: string; qty: string; recipient: string }
 interface ProofPhoto { id: string; uri: string; contentType: string }
 
-const EXPENSE_CATEGORIES = ["Fuel", "Toll", "Food", "Parking", "Other"];
+// Fuel is computed automatically from session GPS — never entered by the rep.
+// (Daily fuel = total actual km × effective rate, see modules/field-ops/daily-fuel.ts)
+const EXPENSE_CATEGORIES = ["Toll", "Food", "Parking", "Other"];
 // Common visit outcomes as one-tap chips. The rep can still type a custom one.
 const OUTCOME_OPTIONS = ["Order taken", "No requirement", "Shop closed", "Follow-up needed", "Sampling done", "Payment collected"];
 

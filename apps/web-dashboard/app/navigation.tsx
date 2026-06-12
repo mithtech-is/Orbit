@@ -63,6 +63,7 @@ const sections: NavSection[] = [
       { label: "Analytics", href: "/analytics", requiredAnyOf: ["report:read"] },
       { label: "Reports", href: "/reports", requiredAnyOf: ["report:read"] },
       { label: "Expenses", href: "/reports/expenses", requiredAnyOf: ["report:read"] },
+      { label: "Fuel approvals", href: "/expenses/approvals", requiredAnyOf: ["report:read"] },
       { label: "Coverage map", href: "/coverage", requiredAnyOf: ["report:read"] },
       { label: "Route & integrity", href: "/field-integrity", requiredAnyOf: ["report:read"] },
       { label: "Field ops", href: "/field-ops", requiredAnyOf: ["report:read"] },
@@ -75,6 +76,7 @@ const sections: NavSection[] = [
     items: [
       { label: "Users", href: "/users", requiredAnyOf: ["user:manage"] },
       { label: "Teams", href: "/teams", requiredAnyOf: ["team:manage"] },
+      { label: "Vehicle types", href: "/vehicle-types", requiredAnyOf: ["organisation:manage"] },
       { label: "Organisation settings", href: "/organisation-settings", requiredAnyOf: ["organisation:manage"] },
       { label: "Integrations", href: "/integrations", requiredAnyOf: ["organisation:manage"] }
     ]

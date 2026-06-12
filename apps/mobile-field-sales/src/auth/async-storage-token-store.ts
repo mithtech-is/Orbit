@@ -30,7 +30,8 @@ export const asyncStorageTokenStore: TokenStorage = {
     await asyncStorageTokenStore.saveSession(next);
   },
   async clear() {
-    await AsyncStorage.multiRemove([SESSION_KEY, LEGACY_TOKEN_KEY]);
+    await AsyncStorage.removeItem(SESSION_KEY);
+    await AsyncStorage.removeItem(LEGACY_TOKEN_KEY);
   },
   async loadSession() {
     const raw = await AsyncStorage.getItem(SESSION_KEY);

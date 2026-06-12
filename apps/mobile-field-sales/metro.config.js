@@ -15,4 +15,10 @@ config.resolver.blockList = Array.isArray(config.resolver.blockList)
   ? [...config.resolver.blockList, ...blocked]
   : [config.resolver.blockList, ...blocked].filter(Boolean);
 
+// pnpm monorepo: ensure the mobile app's own node_modules is resolvable.
+config.resolver.nodeModulesPaths = [
+  ...(config.resolver.nodeModulesPaths ?? []),
+  __dirname + "/node_modules",
+];
+
 module.exports = config;

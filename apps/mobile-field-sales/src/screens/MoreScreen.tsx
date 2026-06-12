@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type JSX } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Linking, Alert, Modal, ActivityIndicator, StyleSheet, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Linking, Alert, Modal, ActivityIndicator, StyleSheet, Platform, NativeModules } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme, type ThemeMode } from "../theme-context";
 import type { Theme } from "../theme";
@@ -16,7 +16,16 @@ interface Props {
   onSignOut: () => void | Promise<void>;
 }
 
-const WEB_BASE = process.env.EXPO_PUBLIC_WEB_DASHBOARD_URL ?? "http://192.168.0.8:3000";
+// Mirror the LAN-IP auto-detection in api-service.ts: derive the dashboard host
+// from the live Metro connection so the "open dashboard" links work on any Wi-Fi
+// (the PC's IP changes per network). EXPO_PUBLIC_WEB_DASHBOARD_URL overrides it.
+function getFallbackWebUrl(): string {
+  const scriptURL = NativeModules.SourceCode?.scriptURL as string | undefined;
+  const match = scriptURL?.match(/^https?:\/\/([^:/]+)/);
+  return match ? `http://${match[1]}:3001` : "http://localhost:3001";
+}
+
+const WEB_BASE = process.env.EXPO_PUBLIC_WEB_DASHBOARD_URL ?? getFallbackWebUrl();
 
 interface WebLink {
   label: string;

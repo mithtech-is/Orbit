@@ -57,7 +57,7 @@ services:
   backend:
     build:
       context: ../..
-      dockerfile: apps/backend-medusa/Dockerfile
+      dockerfile: apps/backend/Dockerfile
     image: orbit-backend:local
     container_name: orbit-backend
     depends_on:
@@ -68,6 +68,14 @@ services:
     environment:
       NODE_ENV: development
       PORT: 9090
+      # Auto-close abandoned work sessions (no ping within the stale window).
+      # OFF by default in development, which let a forgotten session stay "active"
+      # for days and deadlock the field app: start_session 409s ("already active")
+      # while the today-scoped session list hides the old session, so the app can
+      # neither start a new session nor show the old one. Enable it here so stale
+      # sessions are swept every minute (stale window = SESSION_STALE_AFTER_SECONDS,
+      # default 900s) — runs once on boot too, clearing any current stuck session.
+      SESSION_EXPIRY_ENABLED: "true"
       # In-cluster service DNS (host port mappings are irrelevant container-to-container).
       DATABASE_URL: postgres://fieldsales:fieldsales@postgres:5432/fieldsales
       REDIS_URL: redis://redis:6379
@@ -89,7 +97,7 @@ services:
     ports:
       - "9090:9090"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -111,7 +119,7 @@ services:
       # port (9090), not the compose service name.
       NEXT_PUBLIC_API_BASE_URL: http://localhost:9090
       NEXT_PUBLIC_WS_URL: ws://localhost:9090
-      NEXT_PUBLIC_MEDUSA_ADMIN_URL: http://localhost:9090
+      NEXT_PUBLIC_ERP_ADMIN_URL: http://localhost:8082
     ports:
       - "3001:3001"
     healthcheck:

@@ -3,9 +3,10 @@
 import type { JSX } from "react";
 import { RouteMapPicker } from "../components/route-map-picker";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Printer, Map as MapIcon, MapPin, LocateFixed, Search, ExternalLink, GripVertical } from "lucide-react";
 import { apiClient, safeFetch } from "../api-service";
+import { useTrackingSocket } from "@/lib/use-tracking-socket";
 import type { RoutePlanDetail, OutletSummary, UserSummary, PreviewedRouteResponse } from "@orbit/api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,19 +96,20 @@ export default function RoutePlansPage(): JSX.Element {
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; });
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = window.localStorage.getItem("field_sales_token");
-    if (!token) return;
-    const socket = new WebSocket(`${WS_URL}/ws/tracking?token=${encodeURIComponent(token)}`);
-    socket.addEventListener("message", (event) => {
-      try {
-        const parsed = JSON.parse(event.data) as { type?: string };
-        if (parsed.type === "route.plan.created" || parsed.type === "route.plan.assigned") void loadRef.current();
-      } catch { /* ignore */ }
-    });
-    return () => socket.close();
+  // Read the auth token client-side; `undefined` = not read yet, `null` = signed out.
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+  useEffect(() => { setToken(window.localStorage.getItem("field_sales_token")); }, []);
+
+  // Refresh the route list when a plan is created/assigned elsewhere. The shared
+  // socket auto-reconnects with backoff, so a backend restart no longer silently
+  // stops these live refreshes until a manual reload.
+  const onTrackingMessage = useCallback((data: string) => {
+    try {
+      const parsed = JSON.parse(data) as { type?: string };
+      if (parsed.type === "route.plan.created" || parsed.type === "route.plan.assigned") void loadRef.current();
+    } catch { /* ignore */ }
   }, []);
+  useTrackingSocket({ wsUrl: WS_URL, token, enabled: token !== undefined, onMessage: onTrackingMessage });
 
   function toggleOutlet(id: string) {
     setSelectedOutletIds((prev) => {

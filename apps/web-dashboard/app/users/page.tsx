@@ -5,7 +5,7 @@ import { EmptyState } from "../components/empty-state";
 
 import { useEffect, useState } from "react";
 import { apiClient, safeFetch, startImpersonation, loadSession } from "../api-service";
-import type { UserSummary, InviteUserResponse } from "@orbit/api-client";
+import type { UserSummary, InviteUserResponse, VehicleTypeSummary } from "@orbit/api-client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,11 @@ interface ConsentStatus {
 export default function UsersPage(): JSX.Element {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [consent, setConsent] = useState<Record<string, ConsentStatus>>({});
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeSummary[]>([]);
+  const [vehicleEditingId, setVehicleEditingId] = useState<string | null>(null);
+  const [vehicleDraftId, setVehicleDraftId] = useState<string>("");
+  const [vehicleDraftRate, setVehicleDraftRate] = useState<string>("");
+  const [vehicleSaving, setVehicleSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
@@ -48,9 +53,10 @@ export default function UsersPage(): JSX.Element {
 
   async function load() {
     setLoading(true);
-    const [result, consentRes] = await Promise.all([
+    const [result, consentRes, vehicleRes] = await Promise.all([
       safeFetch(() => apiClient.listUsers(), null),
-      safeFetch(() => apiClient.listConsentStatus(), null)
+      safeFetch(() => apiClient.listConsentStatus(), null),
+      safeFetch(() => apiClient.listVehicleTypes(), null)
     ]);
     if (result) {
       setUsers(result.items);
@@ -65,7 +71,30 @@ export default function UsersPage(): JSX.Element {
       }
       setConsent(map);
     }
+    if (vehicleRes) setVehicleTypes(vehicleRes.items);
     setLoading(false);
+  }
+
+  function startVehicleEdit(user: UserSummary) {
+    setVehicleEditingId(user.id);
+    setVehicleDraftId(user.vehicleTypeId ?? "");
+    setVehicleDraftRate(user.fuelRatePerKmCents != null ? (user.fuelRatePerKmCents / 100).toFixed(2) : "");
+  }
+  async function saveVehicleEdit(user: UserSummary) {
+    setVehicleSaving(true);
+    try {
+      const rateNum = vehicleDraftRate.trim() === "" ? null : Math.round(Number(vehicleDraftRate) * 100);
+      await apiClient.updateUserVehicle(user.id, {
+        vehicleTypeId: vehicleDraftId === "" ? null : vehicleDraftId,
+        fuelRatePerKmCents: rateNum
+      });
+      setVehicleEditingId(null);
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Couldn't save vehicle.");
+    } finally {
+      setVehicleSaving(false);
+    }
   }
 
   useEffect(() => {
@@ -207,7 +236,8 @@ export default function UsersPage(): JSX.Element {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead>
-                <TableHead>Status</TableHead><TableHead>Location sharing</TableHead><TableHead></TableHead>
+                <TableHead>Status</TableHead><TableHead>Location sharing</TableHead>
+                <TableHead>Vehicle / rate</TableHead><TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -233,6 +263,49 @@ export default function UsersPage(): JSX.Element {
                         <Badge variant="destructive">Off</Badge>
                         {consent[user.id].revokeReason ? (
                           <span className="text-xs text-muted-foreground" title={consent[user.id].revokeReason ?? ""}>“{consent[user.id].revokeReason}”</span>
+                        ) : null}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user.role !== "field_sales_representative" && user.role !== "sales_manager" ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : vehicleEditingId === user.id ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                          value={vehicleDraftId}
+                          onChange={(e) => setVehicleDraftId(e.target.value)}
+                        >
+                          <option value="">— inherit org default —</option>
+                          {vehicleTypes.filter((v) => v.active || v.id === vehicleDraftId).map((v) => (
+                            <option key={v.id} value={v.id}>{v.name} (₹{(v.fuelRatePerKmCents / 100).toFixed(2)}/km)</option>
+                          ))}
+                        </select>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          placeholder="override ₹/km"
+                          value={vehicleDraftRate}
+                          onChange={(e) => setVehicleDraftRate(e.target.value)}
+                          className="h-8 w-28"
+                        />
+                        <Button size="sm" onClick={() => void saveVehicleEdit(user)} disabled={vehicleSaving}>Save</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setVehicleEditingId(null)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span>
+                          {user.vehicleTypeId
+                            ? (vehicleTypes.find((v) => v.id === user.vehicleTypeId)?.name ?? "Unknown")
+                            : <span className="text-muted-foreground">No vehicle</span>}
+                          {user.fuelRatePerKmCents != null
+                            ? <span className="ml-1 text-muted-foreground">· override ₹{(user.fuelRatePerKmCents / 100).toFixed(2)}/km</span>
+                            : null}
+                        </span>
+                        {user.active ? (
+                          <Button size="sm" variant="ghost" onClick={() => startVehicleEdit(user)}>Edit</Button>
                         ) : null}
                       </div>
                     )}

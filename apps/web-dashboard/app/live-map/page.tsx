@@ -2,12 +2,14 @@
 
 import type { JSX } from "react";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { type LngLatBoundsLike, type Map, type Marker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { TrackingLocationRecordedEvent } from "@orbit/api-client";
 import { apiClient, safeFetch } from "../api-service";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useTrackingSocket, type TrackingSocketState } from "@/lib/use-tracking-socket";
 
 type BadgeVariant = "success" | "default" | "warning" | "destructive" | "secondary";
 
@@ -45,8 +47,6 @@ const MAP_STYLE_URL =
       })
     );
 
-type ConnectionState = "idle" | "connecting" | "open" | "closed" | "error";
-
 interface RepLatest {
   repUserId: string;
   workSessionId: string;
@@ -56,11 +56,12 @@ interface RepLatest {
   recordedAt: string;
 }
 
-function statusCopy(state: ConnectionState): { label: string; variant: BadgeVariant } {
+function statusCopy(state: TrackingSocketState): { label: string; variant: BadgeVariant } {
   switch (state) {
     case "open": return { label: "Connected", variant: "success" };
     case "connecting": return { label: "Connecting…", variant: "default" };
-    case "closed": return { label: "Disconnected", variant: "warning" };
+    case "reconnecting": return { label: "Reconnecting…", variant: "warning" };
+    case "unauthorized": return { label: "Sign in required", variant: "destructive" };
     case "error": return { label: "Connection lost", variant: "destructive" };
     default: return { label: "Idle", variant: "secondary" };
   }
@@ -111,10 +112,15 @@ export default function LiveMapPage(): JSX.Element {
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<Record<string, Marker>>({});
   const repsRef = useRef<Record<string, RepLatest>>({});
-  const [state, setState] = useState<ConnectionState>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [reps, setReps] = useState<Record<string, RepLatest>>({});
   const [mapReady, setMapReady] = useState(false);
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+
+  // Read the auth token on the client only (localStorage is unavailable in SSR).
+  useEffect(() => {
+    setToken(window.localStorage.getItem("field_sales_token"));
+  }, []);
 
   // Initialise MapLibre once.
   useEffect(() => {
@@ -129,7 +135,7 @@ export default function LiveMapPage(): JSX.Element {
     map.on("load", () => setMapReady(true));
     map.on("error", (e) => {
       if (e?.error && (e.error as Error).message?.includes("Failed to fetch")) {
-        setError("Map tiles failed to load. Check your network connection.");
+        setMapError("Map tiles failed to load. Check your network connection.");
       }
     });
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
@@ -140,74 +146,58 @@ export default function LiveMapPage(): JSX.Element {
     };
   }, []);
 
-  // Seed the map with the latest known position per active session on mount.
-  // Without this, the page stays empty until the next WS ping arrives — bad
-  // demo UX when a rep is stationary and the next ping is up to 20s away.
-  useEffect(() => {
-    void (async () => {
-      const latest = await safeFetch(() => apiClient.listLatestPositions(), null);
-      if (!latest || latest.items.length === 0) return;
-      const next: Record<string, RepLatest> = { ...repsRef.current };
-      for (const row of latest.items) {
-        next[row.repUserId] = {
-          repUserId: row.repUserId,
-          workSessionId: row.workSessionId,
-          latitude: row.latitude,
-          longitude: row.longitude,
-          accuracyMeters: row.accuracyMeters,
-          recordedAt: row.recordedAt
-        };
-      }
-      repsRef.current = next;
-      setReps(next);
-    })();
-  }, []);
-
-  // Connect to WS for live updates.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = window.localStorage.getItem("field_sales_token");
-    if (!token) {
-      setError("Please sign in to view live team locations.");
-      setState("error");
-      return;
+  // Seed the map with the latest known position per active session. Called on
+  // every (re)connect so positions that changed while the socket was down still
+  // appear — without it the page would stay empty until the next live ping, and
+  // any movement during an outage would be silently missed.
+  const seedLatestPositions = useCallback(async () => {
+    const latest = await safeFetch(() => apiClient.listLatestPositions(), null);
+    if (!latest || latest.items.length === 0) return;
+    const next: Record<string, RepLatest> = { ...repsRef.current };
+    for (const row of latest.items) {
+      next[row.repUserId] = {
+        repUserId: row.repUserId,
+        workSessionId: row.workSessionId,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        accuracyMeters: row.accuracyMeters,
+        recordedAt: row.recordedAt
+      };
     }
-    const url = `${WS_URL}/ws/tracking?token=${encodeURIComponent(token)}`;
-    setState("connecting");
-    const socket = new WebSocket(url);
-
-    socket.addEventListener("open", () => {
-      setState("open");
-      setError(null);
-    });
-    socket.addEventListener("close", () => setState("closed"));
-    socket.addEventListener("error", () => {
-      setState("error");
-      setError("We couldn't reach the live tracking service. Please try again.");
-    });
-    socket.addEventListener("message", (event) => {
-      try {
-        const parsed = JSON.parse(event.data) as TrackingLocationRecordedEvent | { type: string };
-        if (parsed.type !== "tracking.location.recorded") return;
-        const ev = parsed as TrackingLocationRecordedEvent;
-        const latest: RepLatest = {
-          repUserId: ev.repUserId,
-          workSessionId: ev.workSessionId,
-          latitude: ev.latitude,
-          longitude: ev.longitude,
-          accuracyMeters: ev.accuracyMeters,
-          recordedAt: ev.recordedAt
-        };
-        repsRef.current = { ...repsRef.current, [ev.repUserId]: latest };
-        setReps(repsRef.current);
-      } catch {
-        // ignore malformed frames
-      }
-    });
-    return () => {
-      socket.close();
-    };
+    repsRef.current = next;
+    setReps(next);
   }, []);
+
+  const handleTrackingMessage = useCallback((data: string) => {
+    try {
+      const parsed = JSON.parse(data) as TrackingLocationRecordedEvent | { type: string };
+      if (parsed.type !== "tracking.location.recorded") return;
+      const ev = parsed as TrackingLocationRecordedEvent;
+      const latest: RepLatest = {
+        repUserId: ev.repUserId,
+        workSessionId: ev.workSessionId,
+        latitude: ev.latitude,
+        longitude: ev.longitude,
+        accuracyMeters: ev.accuracyMeters,
+        recordedAt: ev.recordedAt
+      };
+      repsRef.current = { ...repsRef.current, [ev.repUserId]: latest };
+      setReps(repsRef.current);
+    } catch {
+      // ignore malformed frames
+    }
+  }, []);
+
+  // Live updates over the shared reconnecting tracking socket. `token === undefined`
+  // means we haven't read localStorage yet (keep the hook idle); `null` means
+  // signed out (the hook reports `unauthorized`).
+  const { state, attempts, retry } = useTrackingSocket({
+    wsUrl: WS_URL,
+    token,
+    enabled: token !== undefined,
+    onMessage: handleTrackingMessage,
+    onOpen: () => { void seedLatestPositions(); }
+  });
 
   // Prune reps whose last ping has aged out of the live window. Without this a
   // marker added from a real ping would linger on the map forever once the rep
@@ -291,6 +281,18 @@ export default function LiveMapPage(): JSX.Element {
   const status = statusCopy(state);
   const repCount = Object.keys(reps).length;
 
+  // Connection banner: transient reconnects stay reassuring; only a give-up
+  // (`error`) or an auth problem (`unauthorized`) reads as a hard failure with
+  // a Retry affordance. `mapError` (tiles) is surfaced separately.
+  const connectionBanner =
+    state === "reconnecting"
+      ? { tone: "warning" as const, text: "Reconnecting to the live tracking service…", showRetry: false }
+      : state === "error"
+        ? { tone: "destructive" as const, text: "We couldn't reach the live tracking service. It may be temporarily unavailable.", showRetry: true }
+        : state === "unauthorized"
+          ? { tone: "destructive" as const, text: "Please sign in again to view live team locations.", showRetry: false }
+          : null;
+
   const overlayCls = "pointer-events-none absolute inset-0 z-[5] grid place-items-center bg-background/85 text-sm text-muted-foreground";
 
   return (
@@ -303,11 +305,28 @@ export default function LiveMapPage(): JSX.Element {
         <Badge variant={status.variant} className="shrink-0">{status.label}</Badge>
       </div>
 
-      {error ? <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div> : null}
+      {connectionBanner ? (
+        <div
+          className={
+            connectionBanner.tone === "warning"
+              ? "mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground"
+              : "mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          }
+        >
+          <span>{connectionBanner.text}</span>
+          {connectionBanner.showRetry ? (
+            <Button size="sm" variant="outline" onClick={retry}>Retry</Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {mapError ? <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{mapError}</div> : null}
 
       <div ref={containerRef} className="relative h-[560px] w-full overflow-hidden rounded-lg border border-border bg-muted">
         {state === "connecting" ? (
           <div className={overlayCls}>Loading team locations…</div>
+        ) : state === "reconnecting" ? (
+          <div className={overlayCls}>Connection lost — reconnecting{attempts > 1 ? ` (attempt ${attempts})` : ""}…</div>
         ) : repCount === 0 && state === "open" ? (
           <div className={overlayCls}>No active representatives right now.</div>
         ) : state === "error" ? (

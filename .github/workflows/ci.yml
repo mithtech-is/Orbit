@@ -74,7 +74,7 @@ jobs:
       - name: Apply migrations
         env:
           DATABASE_URL: postgres://routepilot:routepilot@localhost:5432/routepilot
-        run: pnpm --filter @fieldsales/backend-medusa migrate up
+        run: pnpm --filter @orbit/backend migrate up
 
   docker-build:
     name: Docker images build
@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Backend image
-        run: docker build -f apps/backend-medusa/Dockerfile -t routepilot-backend:ci .
+        run: docker build -f apps/backend/Dockerfile -t orbit-backend:ci .
       - name: Web image
         run: docker build -f apps/web-dashboard/Dockerfile -t routepilot-web:ci .
 
@@ -102,4 +102,4 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Confirm production env validator rejects missing secrets
-        run: pnpm --filter @fieldsales/backend-medusa test -- env.test
+        run: pnpm --filter @orbit/backend test -- env.test

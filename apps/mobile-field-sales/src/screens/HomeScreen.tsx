@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
-  ActivityIndicator, Alert
+  ActivityIndicator, Alert, NativeModules
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -12,6 +12,7 @@ import { useAuth } from "../auth/auth-context";
 import { useTheme } from "../theme-context";
 import type { Theme } from "../theme";
 import { AccountMenu } from "../components/AccountMenu";
+import { FuelReasonModal } from "../components/FuelReasonModal";
 import { probeForegroundLocationPermission, requestForegroundLocationPermission, getCurrentPosition } from "../tracking/location-probes";
 
 /** Two-letter initials for the avatar circle (e.g. "Rohan Iyer" → "RI"). */
@@ -26,10 +27,21 @@ function initialsOf(name: string | undefined, email: string | undefined): string
 // Match the API_BASE_URL resolution in api-service.ts. EXPO_PUBLIC_* vars are
 // the only ones Metro inlines at bundle time; falling back to MOBILE_WS_URL
 // (set in shell .env files) and finally localhost for simulator development.
+function getFallbackWsUrl() {
+  const scriptURL = NativeModules.SourceCode?.scriptURL;
+  if (scriptURL) {
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+    if (match) {
+      return `ws://${match[1]}:9090`;
+    }
+  }
+  return "ws://localhost:9090";
+}
+
 const WS_BASE_URL =
   process.env.EXPO_PUBLIC_MOBILE_WS_URL ??
   process.env.MOBILE_WS_URL ??
-  "ws://localhost:9000";
+  getFallbackWsUrl();
 
 type Accent = "primary" | "success" | "warning" | "neutral";
 
@@ -63,6 +75,17 @@ export function HomeScreen({
   const [sessionState, setSessionState] = useState<SessionState>({ loading: true, active: false });
   const [sessionBusy, setSessionBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Fuel summary returned by the last stopSession; non-null when over-limit
+  // or off-plan so we can prompt the rep for a reason right there.
+  const [fuelPrompt, setFuelPrompt] = useState<{
+    expenseId: string;
+    actualKm: number;
+    plannedKm: number;
+    deviationKm: number;
+    amountCents: number;
+    deviationAmountCents: number;
+    overLimit: boolean;
+  } | null>(null);
 
   const reload = useCallback(async () => {
     setError(null);
@@ -136,7 +159,13 @@ export function HomeScreen({
     try {
       if (sessionState.active) {
         try {
-          await apiClient.stopSession();
+          const stopResult = await apiClient.stopSession();
+          // Surface the just-computed fuel for the day. We always show the
+          // prompt when overLimit (which is also true for any deviation > 0),
+          // so the rep can attach the context their manager will want to see.
+          if (stopResult.fuel && stopResult.fuel.overLimit) {
+            setFuelPrompt(stopResult.fuel);
+          }
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
           if (!/404/.test(msg)) throw err;
@@ -365,6 +394,21 @@ export function HomeScreen({
         onClose={() => setMenuOpen(false)}
         onSignOut={onSignOut ?? (() => undefined)}
         onOpenSettings={onOpenSettings}
+      />
+
+      <FuelReasonModal
+        visible={fuelPrompt !== null}
+        summary={fuelPrompt}
+        onSubmit={async (expenseId, reason) => {
+          try {
+            await apiClient.submitFieldExpenseReason(expenseId, reason);
+          } catch (err) {
+            Alert.alert("Couldn't submit reason", err instanceof Error ? err.message : "Try again from More.");
+            return;
+          }
+          setFuelPrompt(null);
+        }}
+        onSkip={() => setFuelPrompt(null)}
       />
     </ScrollView>
   );
