@@ -7,7 +7,7 @@ const PRODUCT_NAME = "Orbit";
  * developer-only items (devtools) are kept under View for support sessions
  * but not surfaced as primary actions.
  */
-export function buildMenu(window: BrowserWindow, supportUrl?: string): void {
+export function buildMenu(window: BrowserWindow, supportUrl?: string, onChangeServerUrl?: () => void | Promise<void>): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: "File",
@@ -16,6 +16,14 @@ export function buildMenu(window: BrowserWindow, supportUrl?: string): void {
           label: "Reload",
           accelerator: "CmdOrCtrl+R",
           click: () => window.webContents.reload()
+        },
+        // Always present in the menu; if no handler was wired the item is
+        // disabled rather than missing, so users (and screenshots) see the
+        // affordance consistently.
+        {
+          label: "Change server URL…",
+          enabled: Boolean(onChangeServerUrl),
+          click: () => { if (onChangeServerUrl) void onChangeServerUrl(); }
         },
         { type: "separator" },
         { role: "quit", label: `Quit ${PRODUCT_NAME}` }

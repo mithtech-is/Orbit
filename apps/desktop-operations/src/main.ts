@@ -4,24 +4,38 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadWindowState, saveWindowState } from "./window-state.js";
 import { buildMenu } from "./menu.js";
+import { currentOrDefault, effectiveUrl, shouldPromptForUrl } from "./server-url.js";
+import { promptForServerUrl } from "./prompt-server-url.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Default MUST be :3001 (the Orbit web dashboard). Port 3000 on this machine
-// is the separate Counterflow POS app — defaulting there made the desktop window
-// open the POS instead of Orbit. WEB_URL is also honoured so the launcher's
-// `set WEB_URL=...` works without an extra alias.
-const WEB_URL =
-  process.env.ORBIT_WEB_URL ??
-  process.env.FIELD_SALES_WEB_URL ??
-  process.env.WEB_URL ??
-  "http://localhost:3001";
 const SUPPORT_URL = process.env.ORBIT_SUPPORT_URL;
 
+// Server URL is resolved at startup via server-url.ts:
+//   1. ORBIT_WEB_URL / FIELD_SALES_WEB_URL / WEB_URL  (env override)
+//   2. ~/AppData/Roaming/Orbit/server-url.json        (saved by prompt)
+//   3. http://localhost:3001                          (dev default)
+// `currentWebUrl` holds the value actually loaded into the window so the
+// "Change server URL..." menu item can switch, and the window-open handler
+// can decide whether a clicked link stays inside vs. opens externally.
+let currentWebUrl = "http://localhost:3001";
 let mainWindow: BrowserWindow | undefined;
 
 async function createWindow() {
+  // Resolve the server URL — and, if neither the env nor a saved value is
+  // set, ask the user once before the main window opens. This is the desktop
+  // equivalent of the mobile app's "Advanced — server URL" field, and lets
+  // a freshly-installed copy point at any Orbit backend (localhost, a
+  // Cloudflare tunnel URL, a hosted deployment) without code changes.
+  if (await shouldPromptForUrl()) {
+    const fromPrompt = await promptForServerUrl(null, await currentOrDefault());
+    if (fromPrompt) currentWebUrl = fromPrompt;
+    else currentWebUrl = await effectiveUrl(); // user cancelled — fall back to default
+  } else {
+    currentWebUrl = await effectiveUrl();
+  }
+
   const state = await loadWindowState();
 
   mainWindow = new BrowserWindow({
@@ -39,7 +53,14 @@ async function createWindow() {
     }
   });
 
-  buildMenu(mainWindow, SUPPORT_URL);
+  buildMenu(mainWindow, SUPPORT_URL, async () => {
+    if (!mainWindow) return;
+    const next = await promptForServerUrl(mainWindow, currentWebUrl);
+    if (next) {
+      currentWebUrl = next;
+      void mainWindow.loadURL(currentWebUrl);
+    }
+  });
 
   // Persist window state on close.
   mainWindow.on("close", () => {
@@ -50,14 +71,14 @@ async function createWindow() {
 
   // Open external links in the OS browser, not inside the app window.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith(WEB_URL)) {
+    if (url.startsWith(currentWebUrl)) {
       return { action: "allow" };
     }
     void shell.openExternal(url);
     return { action: "deny" };
   });
 
-  void mainWindow.loadURL(WEB_URL);
+  void mainWindow.loadURL(currentWebUrl);
 }
 
 function registerIpc() {
