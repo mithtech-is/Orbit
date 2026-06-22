@@ -50,11 +50,21 @@ export function promptForServerUrl(parent: BrowserWindow | null, defaultValue: s
     };
 
     ipcMain.handle("prompt-server-url:submit", async (_e, raw: unknown) => {
-      const url = typeof raw === "string" ? normaliseUrl(raw) : null;
-      if (!url) return { ok: false, message: "That URL doesn't look right. Try https://your-orbit.example.com" };
-      await saveStored(url);
-      finish(url);
-      return { ok: true };
+      try {
+        const url = typeof raw === "string" ? normaliseUrl(raw) : null;
+        if (!url) return { ok: false, message: "That URL doesn't look right. Try https://your-orbit.example.com" };
+        await saveStored(url);
+        finish(url);
+        return { ok: true };
+      } catch (err) {
+        // Without this catch, a thrown saveStored() (e.g. bad userData dir
+        // permissions) would reject the IPC call; the renderer's `await`
+        // throws and the Continue button stays disabled with no visible
+        // error. Surface the message to the user AND log to the terminal.
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[prompt-server-url] save failed:", err);
+        return { ok: false, message: `Couldn't save: ${msg}` };
+      }
     });
     ipcMain.handle("prompt-server-url:cancel", async () => { finish(null); return { ok: true }; });
 

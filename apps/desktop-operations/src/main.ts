@@ -10,6 +10,15 @@ import { promptForServerUrl } from "./prompt-server-url.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// The package.json name is "@orbit/desktop-operations" — the slash is invalid
+// in a Windows folder name, so by default app.getPath("userData") would
+// resolve to %APPDATA%\@orbit/desktop-operations and our saveStored() call
+// would silently fail (IPC reject -> renderer's Continue button hangs).
+// Force a clean name; userData becomes %APPDATA%\Orbit on Windows and
+// ~/Library/Application Support/Orbit on macOS. Must be called BEFORE
+// app.whenReady() and BEFORE any path lookups.
+app.setName("Orbit");
+
 const SUPPORT_URL = process.env.ORBIT_SUPPORT_URL;
 
 // Server URL is resolved at startup via server-url.ts:
