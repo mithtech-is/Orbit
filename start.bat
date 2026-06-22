@@ -75,16 +75,18 @@ REM  `tofu apply` fail with a "port already allocated" error. `compose down`
 REM  releases the ports but PRESERVES the data volume (orbit-postgres), so this
 REM  is safely re-runnable.
 docker compose -f "%COMPOSE%" down 2>nul
-set "TOFU=%LOCALAPPDATA%\OpenTofu\tofu.exe"
-if not exist "%TOFU%" (
-  where tofu >nul 2>&1
-  if errorlevel 1 (
-    echo ERROR: OpenTofu not found. Expected at %TOFU% or on PATH.
-    echo Install: https://opentofu.org/docs/intro/install/  ^(or re-run the installer^)
-    pause
-    exit /b 1
-  )
-  set "TOFU=tofu"
+REM ensure-tofu.ps1 self-heals: if OpenTofu isn't installed, it downloads the
+REM ~85MB Windows zip from the official release and unpacks it. Echoes the
+REM resolved path on stdout, which we capture into %TOFU%. Never errors on a
+REM machine with internet; if the download itself fails the user sees clear
+REM PowerShell output and the bat falls through to the explicit error below.
+set "TOFU="
+for /f "usebackq tokens=*" %%T in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO%scripts\ensure-tofu.ps1"`) do set "TOFU=%%T"
+if not defined TOFU (
+  echo ERROR: OpenTofu auto-install failed. Check internet connection,
+  echo or install manually from https://opentofu.org/docs/intro/install/
+  pause
+  exit /b 1
 )
 echo [2b/3] Provisioning stack via OpenTofu...
 pushd "%REPO%tofu" >nul
