@@ -120,10 +120,28 @@ function registerIpc() {
   });
 }
 
-app.whenReady().then(() => {
-  registerIpc();
-  void createWindow();
-});
+// Single-instance lock — if Orbit is already running, exit this process
+// immediately and just focus the existing window. Without this, running
+// `pnpm dev:desktop` while a previous Orbit is still alive lets two Chromium
+// processes race for the same userData dir, producing "Unable to move the
+// cache: Access is denied" / "Failed to delete the database" GPU errors and
+// (more importantly) two prompt windows fighting for the URL.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(() => {
+    registerIpc();
+    void createWindow();
+  });
+}
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
