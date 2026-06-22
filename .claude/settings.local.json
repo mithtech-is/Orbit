@@ -3,7 +3,11 @@
     "allow": [
       "PowerShell(corepack enable)",
       "PowerShell(corepack prepare pnpm@latest --activate 2>&1)",
-      "PowerShell(Get-Command pnpm -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Command pnpm -ErrorAction SilentlyContinue)",
+      "Bash(pnpm exec *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(pnpm --filter @orbit/api-client build)",
+      "Bash(pnpm --filter @orbit/api-client run build)"
     ]
   }
 }

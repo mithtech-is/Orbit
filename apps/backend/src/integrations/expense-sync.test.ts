@@ -48,7 +48,15 @@ describe("syncVisitExpensesToErp", () => {
           created_at: "2026-06-03T10:00:00.000Z"
         }
       ])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([]) // getErpMapping for expense_claim
+      .mockResolvedValueOnce([
+        {
+          id: "rep_1",
+          name: "Anita Rep",
+          email: "anita@example.com",
+          role: "field_sales_representative"
+        }
+      ]); // loadRep inside syncRepToErpAsEmployee
 
     await syncVisitExpensesToErp("org_1", "visit_1");
 

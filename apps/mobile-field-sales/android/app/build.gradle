@@ -29,12 +29,14 @@ react {
     extraPackagerArgs = ["--entry-file", new File(projectRoot, "index.js").getAbsolutePath()]
 
     /* Folders */
-     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
-    // root = file("../../")
-    //   The folder where the react-native NPM package is. Default is ../../node_modules/react-native
-    // reactNativeDir = file("../../node_modules/react-native")
-    //   The folder where the react-native Codegen package is. Default is ../../node_modules/@react-native/codegen
-    // codegenDir = file("../../node_modules/@react-native/codegen")
+    // Defaults work for Metro/codegen/react-native lookup because they use
+    // Node's `require.resolve` (sees the workspace's hoisted node_modules).
+    // Only `hermesCommand` does a hard-coded relative lookup at `<root>/node_modules/
+    // hermes-compiler/...`, which is not present at the default `<root>` in a
+    // pnpm monorepo. Override with an absolute path. From app/build.gradle,
+    // `../../../..` walks app -> android -> mobile-field-sales -> apps -> Orbit
+    // (workspace root). %OS-BIN% is replaced by gradle (win64-bin on Windows).
+    hermesCommand = file("../../../../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc.exe").absolutePath
 
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
@@ -95,9 +97,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.routepilot.mobile'
+    namespace 'com.orbit.mobile'
     defaultConfig {
-        applicationId 'com.routepilot.mobile'
+        applicationId 'com.orbit.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

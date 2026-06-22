@@ -4,8 +4,8 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "dev": "expo start --port 8088",
-    "dev:client": "expo start --dev-client --port 8088",
+    "dev": "react-native start --port 8088",
+    "start": "react-native start --port 8088",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "build:android": "eas build --platform android --profile development",

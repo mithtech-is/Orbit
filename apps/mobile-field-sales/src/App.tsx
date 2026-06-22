@@ -1,10 +1,11 @@
-import type { JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider, useTheme } from "./theme-context";
 import { AppNavigator } from "./navigation/AppNavigator";
 import { asyncStorageTokenStore } from "./auth/async-storage-token-store";
-import { apiClient } from "./api-service";
+import { apiClient, hydrateServerUrl } from "./api-service";
 import {
   probeForegroundLocationPermission,
   probeBackgroundLocationPermission,
@@ -43,10 +44,18 @@ const defaultProbes = {
 };
 
 export function App(): JSX.Element {
+  // Read the user-saved Server URL from AsyncStorage BEFORE rendering screens
+  // — otherwise the very first API call (rehydrate session) would hit the
+  // build-time URL and fail in standalone APKs that don't run against Metro.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    hydrateServerUrl().finally(() => setReady(true));
+  }, []);
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <ThemedRoot />
+        {ready ? <ThemedRoot /> : <View style={{ flex: 1 }} />}
       </ThemeProvider>
     </SafeAreaProvider>
   );

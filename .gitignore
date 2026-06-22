@@ -41,3 +41,6 @@ Thumbs.db
 # Generated knowledge-graph artifacts (rebuild with: graphify update .)
 graphify-out/
 *.sync-conflict-*
+
+# Built APKs (84MB+) — distribute via GitHub releases or file-share, not git
+*.apk

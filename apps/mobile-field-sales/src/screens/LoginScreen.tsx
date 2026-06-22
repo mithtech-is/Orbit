@@ -1,8 +1,9 @@
-import { useMemo, useState, type JSX } from "react";
+import { useEffect, useMemo, useState, type JSX } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { loginAndPersist } from "../api-service";
+import { applyServerUrl, currentServerUrl, loginAndPersist } from "../api-service";
+import { normaliseServerUrl } from "../config/server-config";
 import { useTheme } from "../theme-context";
 import type { Theme } from "../theme";
 import type { MobileSession, TokenStorage } from "../auth/token-storage";
@@ -34,10 +35,28 @@ export function LoginScreen({ storage, onAuthenticated }: Props): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // "Server URL" override — pre-filled with the current effective URL (saved
+  // override OR build-time baked URL). Hidden under an "Advanced" toggle so
+  // it's there for tunnel/hosted demos without cluttering the dev login.
+  const [serverUrl, setServerUrl] = useState(() => currentServerUrl());
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  useEffect(() => { setServerUrl(currentServerUrl()); }, []);
+
   async function submit() {
     setError(null);
     setLoading(true);
     try {
+      // Persist/apply the Server URL FIRST so the login request actually hits
+      // the host the user just typed. Skip if they didn't change the prefill.
+      const normalised = normaliseServerUrl(serverUrl);
+      if (!normalised) {
+        setError("Server URL doesn't look right. Example: https://my-orbit.trycloudflare.com");
+        setLoading(false);
+        return;
+      }
+      if (normalised !== currentServerUrl()) {
+        await applyServerUrl(normalised);
+      }
       const session = await loginAndPersist(storage, { email, password, organisationId });
       onAuthenticated(session);
     } catch (err) {
@@ -103,6 +122,41 @@ export function LoginScreen({ storage, onAuthenticated }: Props): JSX.Element {
             />
           </View>
 
+          <TouchableOpacity
+            style={styles.advancedToggle}
+            onPress={() => setAdvancedOpen((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={advancedOpen ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color={theme.color.textMuted}
+            />
+            <Text style={styles.advancedLabel}>Advanced — server URL</Text>
+          </TouchableOpacity>
+
+          {advancedOpen ? (
+            <>
+              <Text style={styles.helperText}>
+                The address of your Orbit server. Defaults to what was built into the app — change it
+                if your admin gave you a different URL (e.g. a Cloudflare tunnel for a demo).
+              </Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="globe-outline" size={18} color={theme.color.textMuted} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://orbit.example.com"
+                  placeholderTextColor={theme.color.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  value={serverUrl}
+                  onChangeText={setServerUrl}
+                />
+              </View>
+            </>
+          ) : null}
+
           {error ? (
             <View style={styles.errorBox}>
               <Ionicons name="alert-circle-outline" size={16} color={theme.color.danger} />
@@ -152,5 +206,11 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     alignItems: "center", marginTop: theme.spacing.xl, ...theme.elevation.glow
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: theme.color.textOnPrimary, fontWeight: "700", fontSize: 15 }
+  buttonText: { color: theme.color.textOnPrimary, fontWeight: "700", fontSize: 15 },
+  advancedToggle: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    marginTop: theme.spacing.lg, paddingVertical: 6
+  },
+  advancedLabel: { ...theme.font.label, color: theme.color.textMuted, textTransform: "uppercase" },
+  helperText: { ...theme.font.caption, marginBottom: theme.spacing.xs, lineHeight: 16 }
 });

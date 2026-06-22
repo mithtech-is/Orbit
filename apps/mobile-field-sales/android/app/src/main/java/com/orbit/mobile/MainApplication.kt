@@ -1,4 +1,4 @@
-package com.routepilot.mobile
+package com.orbit.mobile
 
 import android.app.Application
 import android.content.res.Configuration
@@ -14,12 +14,16 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import com.facebook.react.defaults.DefaultReactNativeHost
 
 import expo.modules.ApplicationLifecycleDispatcher
-import expo.modules.ReactNativeHostWrapper
+import expo.modules.ExpoReactHostFactory
 
 class MainApplication : Application(), ReactApplication {
 
-  override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
-      this,
+  // Expo SDK 56 / React Native 0.86 replaced `ReactNativeHostWrapper` with
+  // `ExpoReactHostFactory` for the bridgeless host, and stopped wrapping the
+  // legacy ReactNativeHost. The legacy host is still required by the
+  // `ReactApplication` interface for backward compat; we provide it as a
+  // pass-through (no wrapper) — it isn't actually used in bridgeless mode.
+  override val reactNativeHost: ReactNativeHost =
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
@@ -33,10 +37,9 @@ class MainApplication : Application(), ReactApplication {
 
           override val isNewArchEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
       }
-  )
 
   override val reactHost: ReactHost
-    get() = ReactNativeHostWrapper.createReactHost(applicationContext, reactNativeHost)
+    get() = ExpoReactHostFactory.getDefaultReactHost(applicationContext, PackageList(this).packages)
 
   override fun onCreate() {
     super.onCreate()

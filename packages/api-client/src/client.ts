@@ -1338,6 +1338,14 @@ export function createApiClient(options: ApiClientOptions) {
 
     setToken(token: string) {
       options.token = token;
+    },
+
+    setBaseUrl(baseUrl: string) {
+      options.baseUrl = baseUrl;
+    },
+
+    getBaseUrl() {
+      return options.baseUrl;
     }
   };
 }

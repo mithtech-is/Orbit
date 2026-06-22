@@ -2,6 +2,7 @@ import { createApiClient } from "@orbit/api-client";
 import type { MobileSession, TokenStorage } from "./auth/token-storage";
 
 import { NativeModules } from "react-native";
+import { loadStoredServerUrl, saveServerUrl, bakedServerUrl } from "./config/server-config";
 
 // Expo Metro only inlines env vars prefixed with EXPO_PUBLIC_ at bundle time.
 // `process.env` doesn't exist at runtime in React Native, so the var must be
@@ -18,12 +19,47 @@ function getFallbackApiUrl() {
   return "http://localhost:9090";
 }
 
-const API_BASE_URL =
+// Initial value at module load. AsyncStorage is async, so we can't read it
+// synchronously here — `hydrateServerUrl()` is called from App startup and
+// overrides this before any API call goes out. The order of preference:
+//   1. AsyncStorage override (hydrated on startup; set by the login screen)
+//   2. EXPO_PUBLIC_* baked into the bundle at build time
+//   3. Metro scriptURL auto-detection (dev only)
+//   4. localhost
+const INITIAL_BASE_URL =
   process.env.EXPO_PUBLIC_MOBILE_API_BASE_URL ??
   process.env.MOBILE_API_BASE_URL ??
   getFallbackApiUrl();
 
-export const apiClient = createApiClient({ baseUrl: API_BASE_URL });
+export const apiClient = createApiClient({ baseUrl: INITIAL_BASE_URL });
+
+/**
+ * Read the persisted server URL and apply it to the client. Call ONCE at app
+ * startup BEFORE any screen mounts that issues API calls. Safe to call again
+ * after the user changes the URL (idempotent re-read).
+ */
+export async function hydrateServerUrl(): Promise<string> {
+  const stored = await loadStoredServerUrl();
+  const effective = stored ?? INITIAL_BASE_URL;
+  apiClient.setBaseUrl(effective);
+  return effective;
+}
+
+/** Persist a new server URL and switch the live client to it. */
+export async function applyServerUrl(url: string): Promise<void> {
+  await saveServerUrl(url);
+  apiClient.setBaseUrl(url);
+}
+
+/** What the user sees as the current effective URL (for prefill in UI). */
+export function currentServerUrl(): string {
+  return apiClient.getBaseUrl();
+}
+
+/** Exposed for screens that build their own URLs (web dashboard link, WS). */
+export function defaultServerUrl(): string {
+  return bakedServerUrl();
+}
 
 /** Mirrors backend auth/areas.ts — only field reps belong in the field app. */
 function areaForRole(role: string | undefined): "admin" | "field" {

@@ -96,18 +96,36 @@ To stop later (your data is kept): `docker compose -f infra/docker/docker-compos
 
 ---
 
-## 📱 Run the Mobile app (Expo)
+## 📱 Run the Mobile app (React Native & Android)
 
 The mobile app runs on the host (it's a client of the backend).
 
-**Prerequisites:** Node 20+ and `pnpm` 9 (`npm i -g pnpm`).
+**Prerequisites:** Node 20+, `pnpm` 9, and the Android SDK/NDK (for native builds).
 
+### Running on a Real Android Device (Without Expo)
+
+To run the app natively on a physical Android device connected via USB:
+
+1. Connect your device to your computer via USB.
+2. Enable **USB Debugging** in the device's Developer Options.
+3. Run the automated script from the workspace root:
+   ```cmd
+   run-android-native.bat
+   ```
+   This script configures port forwarding (`adb reverse`), boots the Metro packager on port 8088, compiles the project, and installs/launches the native Android app on your device.
+
+4. Verify your local backend is running (e.g., using `start.bat`).
+
+*Note: For iOS native CLI execution, use `pnpm --filter @orbit/mobile-field-sales ios`.*
+
+### Running via Expo (Alternative)
+
+If you prefer to start the Metro packager using Expo:
 ```bash
 pnpm install
 pnpm --filter @orbit/mobile-field-sales dev   # starts Expo Metro (default :8088)
 ```
-
-Scan the QR code with **Expo Go**, or run on an emulator. To build a standalone APK you'll need `expo prebuild` + Android Studio / EAS (see `docs/engineering/mobile-production-build-guide.md`).
+Scan the QR code with **Expo Go**, or run on an emulator. To build a standalone APK, see [mobile-production-build-guide.md](file:///c:/Users/supari_k/ayush/Orbit/docs/engineering/mobile-production-build-guide.md).
 
 ## 🖥️ Run the Desktop app (Electron)
 
