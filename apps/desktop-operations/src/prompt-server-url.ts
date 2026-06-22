@@ -15,9 +15,16 @@ const __dirname = path.dirname(__filename);
 export function promptForServerUrl(parent: BrowserWindow | null, defaultValue: string): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
     const win = new BrowserWindow({
-      width: 460,
-      height: 280,
-      resizable: false,
+      // useContentSize: dimensions cover the renderable area, NOT the OS title
+      // bar/borders, so the content fits the same way regardless of platform
+      // and DPI scaling. Sized generously so the Continue button is never
+      // pushed below the viewport on Windows 125%/150% scaling.
+      useContentSize: true,
+      width: 520,
+      height: 360,
+      minWidth: 460,
+      minHeight: 320,
+      resizable: true,   // user can drag larger if they have unusual scaling
       minimizable: false,
       maximizable: false,
       modal: parent !== null,
@@ -61,20 +68,25 @@ function promptHtml(defaultValue: string): string {
   // Inline HTML so we don't have to ship an extra asset; matches the style of
   // the existing About dialog. The form uses the contextBridge API set up in
   // prompt-preload.ts to talk to the main process.
+  // Layout note: body is a flex column with the footer (button row) pinned at
+  // the bottom via `margin-top: auto`. That way the Continue button is ALWAYS
+  // visible inside the window even if the user has unusual DPI scaling or
+  // resizes the window smaller — the description text shrinks, not the controls.
   return `<!doctype html><html><head><meta charset="utf-8">
 <title>Orbit — server URL</title>
 <style>
   *{box-sizing:border-box}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;color:#111827;background:#ffffff}
-  h1{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
-  h1 .dot{width:12px;height:12px;border-radius:50%;background:#00aaff;box-shadow:0 0 0 4px rgba(0,170,255,0.12)}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;color:#111827;background:#ffffff;display:flex;flex-direction:column}
+  h1{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  h1 .dot{width:12px;height:12px;border-radius:50%;background:#00aaff;box-shadow:0 0 0 4px rgba(0,170,255,0.12);flex-shrink:0}
   p{color:#6b7280;margin:8px 0 16px;font-size:13px;line-height:1.45}
   label{font-size:11px;font-weight:600;color:#374151;letter-spacing:0.04em;text-transform:uppercase}
-  input{display:block;width:100%;margin-top:6px;padding:10px 12px;font-size:14px;border:1px solid #d1d5db;border-radius:6px;outline:none}
+  input{display:block;width:100%;margin-top:6px;padding:11px 12px;font-size:14px;border:1px solid #d1d5db;border-radius:6px;outline:none}
   input:focus{border-color:#00aaff;box-shadow:0 0 0 3px rgba(0,170,255,0.15)}
   .err{color:#dc2626;font-size:12px;margin-top:8px;min-height:16px}
-  .row{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
-  button{font-size:13px;font-weight:600;padding:9px 16px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+  .row{display:flex;justify-content:flex-end;gap:8px;margin-top:auto;padding-top:16px}
+  button{font-size:14px;font-weight:600;padding:10px 18px;border-radius:6px;cursor:pointer;border:1px solid transparent;min-width:96px}
   .secondary{background:#fff;color:#374151;border-color:#d1d5db}
   .primary{background:#00aaff;color:#fff}
   button:disabled{opacity:.5;cursor:default}
