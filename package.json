@@ -17,7 +17,7 @@
     "dev:backend": "pnpm --filter @orbit/backend dev",
     "dev:web": "pnpm --filter @orbit/web-dashboard dev",
     "dev:mobile": "pnpm --filter @orbit/mobile-field-sales dev",
-    "dev:desktop": "pnpm --filter @orbit/desktop-operations dev"
+    "dev:desktop": "node scripts/ensure-electron.mjs && pnpm --filter @orbit/desktop-operations dev"
   },
   "dependencies": {
     "pg": "^8.13.1"
