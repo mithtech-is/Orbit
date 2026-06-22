@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Linking, ScrollView } from "react-native";
+import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
-import * as WebBrowser from "expo-web-browser";
 import { apiClient } from "../api-service";
 import type { OutletSummary, PreviewedRouteResponse, RouteStopDetail } from "@orbit/api-client";
 import { useTheme } from "../theme-context";
@@ -22,7 +22,16 @@ interface RouteMapScreenProps {
   onOpenStop?: (planId: string, stop: RouteStopDetail) => void;
 }
 
-function mapPageUrl(
+/**
+ * Build the Leaflet/OSM HTML that renders inside the in-app WebView.
+ *
+ * We use Leaflet over a native MapView (react-native-maps / expo-maps) because
+ * those require a Google Maps API key on Android — Leaflet + OSM tiles needs
+ * no keys, has no per-tile billing, and lets us share map styling with the
+ * web dashboard's live-map page. The phone needs internet for tiles, which
+ * is already required for the backend tunnel.
+ */
+function mapPageHtml(
   outlets: OutletSummary[],
   orderById: Map<string, OrderedStop>,
   currentStopIndex: number,
@@ -52,7 +61,7 @@ function mapPageUrl(
   outlets.forEach((o) => pts.push(`[${o.latitude},${o.longitude}]`));
   const boundsJs = pts.length > 1 ? `setTimeout(()=>m.fitBounds([${pts.join(",")}],{padding:[40,40],maxZoom:15}),300);` : "";
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -65,8 +74,6 @@ ${markers.join(";")}
 ${polylineJs}
 ${boundsJs}
 </script></body></html>`;
-
-  return "data:text/html;charset=utf-8," + encodeURIComponent(html);
 }
 
 export function RouteMapScreen({ onOpenStop }: RouteMapScreenProps = {}): JSX.Element {
@@ -187,10 +194,14 @@ export function RouteMapScreen({ onOpenStop }: RouteMapScreenProps = {}): JSX.El
     });
   }
 
-  function openFullMap() {
-    const url = mapPageUrl(outlets, orderById, currentStopIndex, currentPosition, polylineCoords);
-    void WebBrowser.openBrowserAsync(url);
-  }
+  // The map HTML is re-derived whenever stops, current position, or progress
+  // change. We feed it into <WebView source={{ html }}/> so the user gets a
+  // proper interactive map INSIDE the app (no browser hop, no Leaflet popup
+  // disappearing because the OS pushed Chrome to the foreground).
+  const mapHtml = useMemo(
+    () => mapPageHtml(outlets, orderById, currentStopIndex, currentPosition, polylineCoords),
+    [outlets, orderById, currentStopIndex, currentPosition, polylineCoords]
+  );
 
   const stopsList = optimised?.orderedStops ?? [];
   const atHomeLeg = optimised ? currentStopIndex >= stopsList.length : false;
@@ -235,11 +246,23 @@ export function RouteMapScreen({ onOpenStop }: RouteMapScreenProps = {}): JSX.El
 
   return (
     <View style={styles.shell}>
-      <TouchableOpacity style={styles.mapPlaceholder} onPress={openFullMap} activeOpacity={0.8}>
-        <Text style={styles.mapPlaceholderIcon}>🗺</Text>
-        <Text style={styles.mapPlaceholderText}>Tap to open full map</Text>
-        <Text style={styles.mapPlaceholderHint}>Opens in browser with all stops & route</Text>
-      </TouchableOpacity>
+      <View style={styles.mapWrap}>
+        <WebView
+          // `originWhitelist=*` is required for HTML loaded via `source.html`
+          // (no URL); without it Android blocks the page from loading the
+          // Leaflet JS/CSS hosted on unpkg.com.
+          originWhitelist={["*"]}
+          source={{ html: mapHtml, baseUrl: "https://localhost/" }}
+          style={styles.mapView}
+          androidLayerType="hardware"
+          javaScriptEnabled
+          domStorageEnabled
+          // Don't let any link inside the map open the system browser; this
+          // screen is the only place we want to render the map.
+          setSupportMultipleWindows={false}
+          onShouldStartLoadWithRequest={(req) => req.url.startsWith("data:") || req.url.startsWith("about:") || req.url.startsWith("https://")}
+        />
+      </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -354,17 +377,21 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   shell: { flex: 1, backgroundColor: theme.color.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: theme.color.background },
   muted: { ...theme.font.caption },
-  mapPlaceholder: {
-    height: 220, backgroundColor: theme.color.primarySoft, margin: 12, borderRadius: theme.radius.md,
-    alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: theme.color.border,
-    borderStyle: "dashed",
-  },
-  mapPlaceholderIcon: { fontSize: 40, marginBottom: 8 },
-  mapPlaceholderText: { ...theme.font.bodyStrong, color: theme.color.primary },
-  mapPlaceholderHint: { ...theme.font.caption, marginTop: 4 },
+  // Map area takes ALL space the panel doesn't claim. flex:1 here, the panels
+  // below have intrinsic content height (and ScrollView max-height when a
+  // route is loaded). Effect: with no route, the map is nearly full-screen;
+  // with a route, the map shares half-and-half with the stop list.
+  mapWrap: { flex: 1, backgroundColor: theme.color.background },
+  mapView: { flex: 1, backgroundColor: theme.color.background },
   error: { color: theme.color.danger, fontSize: 12, margin: 12, marginBottom: 0 },
   controlsPanel: { margin: 12, padding: theme.spacing.md, backgroundColor: theme.color.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.border },
-  scrollPanel: { margin: 12, marginTop: 0 },
+  scrollPanel: {
+    margin: 12, marginTop: 0,
+    // Cap the panel height so the map above always stays clearly visible
+    // when a route is loaded. Without this the stop list could push the map
+    // out of the viewport on smaller phones.
+    maxHeight: "55%",
+  },
   panelTitle: { ...theme.font.bodyStrong },
   panelSub: { ...theme.font.caption, marginTop: 2, marginBottom: 10 },
   primaryBtn: { backgroundColor: theme.color.primary, padding: 12, borderRadius: theme.radius.sm, alignItems: "center" },
