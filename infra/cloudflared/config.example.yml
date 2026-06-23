@@ -1,0 +1,24 @@
+# Orbit named Cloudflare tunnel — TEMPLATE.
+#
+# The REAL config lives at ~/.cloudflared/config.yml (per-machine, NOT committed
+# — it references a secret credentials file). This template documents the shape.
+#
+# Setup that produces the real file + credentials (see README.md):
+#   cloudflared tunnel login                         # browser auth to mith.tech
+#   cloudflared tunnel create orbit                  # writes <UUID>.json creds
+#   cloudflared tunnel route dns orbit orbit.mith.tech
+#   # then write ~/.cloudflared/config.yml like below with YOUR UUID + creds path
+
+# The tunnel UUID printed by `cloudflared tunnel create orbit`.
+tunnel: <YOUR-TUNNEL-UUID>
+# Absolute path to the credentials JSON `tunnel create` wrote into ~/.cloudflared/.
+# KEEP SECRET — never commit this file.
+credentials-file: <HOME>/.cloudflared/<YOUR-TUNNEL-UUID>.json
+
+ingress:
+  # Public https://orbit.mith.tech -> local Orbit backend (API + WebSocket).
+  # Cloudflare terminates TLS with a real cert; the backend stays plain http.
+  - hostname: orbit.mith.tech
+    service: http://localhost:9090
+  # Catch-all: clean 404 for anything else hitting this tunnel.
+  - service: http_status:404

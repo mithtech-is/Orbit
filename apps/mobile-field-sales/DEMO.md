@@ -6,12 +6,17 @@ internet (not just on the same Wi-Fi as the laptop).
 ## What you have
 
 - **`apps/mobile-field-sales/Orbit-demo.apk`** — installable release APK
-  (84 MB, signed with Android debug key, target SDK 36 / min SDK 24).
+  (~85 MB, signed with Android debug key, target SDK 36 / min SDK 24).
   *Gitignored* — rebuild it locally rather than trying to fetch it from GitHub.
-- **`start-tunnel.bat`** / **`start-tunnel.command`** — opens a public
-  Cloudflare URL (`https://<random>.trycloudflare.com`) that forwards to the
-  laptop's `:9090`. URL changes each time the tunnel starts; the in-app
-  **"Advanced → server URL"** field accepts whatever the current URL is.
+  **It has the permanent URL `https://orbit.mith.tech` baked in** — no pasting.
+- **`start-orbit-tunnel.bat`** / **`.command`** — brings the permanent URL
+  `https://orbit.mith.tech` online (named Cloudflare tunnel → laptop `:9090`).
+  The URL **never changes**, so the phone needs zero configuration. See
+  `infra/cloudflared/README.md` for how the tunnel was set up.
+
+> There's also an older `start-tunnel.bat` that opens a *random*
+> `trycloudflare.com` URL — that's the fallback for when the named tunnel
+> isn't available. Prefer `start-orbit-tunnel.bat`.
 
 ## Pre-demo (do once)
 
@@ -19,6 +24,7 @@ internet (not just on the same Wi-Fi as the laptop).
    - Plug the phone into the laptop (USB cable, "File transfer" mode).
    - Drag `apps/mobile-field-sales/Orbit-demo.apk` to the phone's storage.
    - On the phone, tap the APK → grant "Install from this source" if asked.
+   - **Uninstall any older Orbit first** so stale saved settings don't linger.
 
    *Or:* email it / put it on a USB drive / share via Drive — the file is
    self-contained.
@@ -26,22 +32,21 @@ internet (not just on the same Wi-Fi as the laptop).
 2. **Run the stack once** (`start.bat` / `start.command`) to make sure
    everything's seeded and healthy.
 
-3. **Run `start-tunnel.bat` / `start-tunnel.command`** and copy the printed
-   `https://...trycloudflare.com` URL. Open the app, log in once with that
-   URL so you've validated the path end-to-end. (The app remembers the URL
-   across launches.)
+3. **Run `start-orbit-tunnel.bat`** and confirm `https://orbit.mith.tech/health`
+   loads in any browser. Open the app and sign in once to validate end-to-end.
 
 ## At the demo
 
 1. Open `start.bat` on the laptop. Wait for "ORBIT is running!".
-2. Open `start-tunnel.bat`. Copy the printed URL.
-3. On the demo phone:
-   - Open Orbit.
-   - On the login screen, tap **"Advanced — server URL"**.
-   - Paste the URL.
-   - Sign in: `rep1@acme-fieldsales.test` / `admin123` / org `mithtech`.
+2. Open `start-orbit-tunnel.bat`. Keep the window open.
+3. On the demo phone — just open Orbit and sign in. **Nothing to configure**;
+   the app already points at `https://orbit.mith.tech`.
+   - `rep1@acme-fieldsales.test` / `admin123` / org `mithtech`.
 4. On the laptop's browser, log into the dashboard:
    `admin@fieldsales.local` / `admin123` / org `mithtech`.
+
+Works from **any network** — mobile data, the client's Wi-Fi, anywhere with
+internet. No hotspot, no IP, no pasting.
 
 The phone talks to the laptop's backend through Cloudflare — works from
 any network with internet (mobile data, client Wi-Fi, hotel Wi-Fi…).
